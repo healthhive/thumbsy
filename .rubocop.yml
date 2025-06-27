@@ -1,0 +1,92 @@
+# Simplified RuboCop configuration focusing on core Ruby style issues
+
+AllCops:
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "bin/**/*"
+    - "vendor/**/*"
+    - "tmp/**/*"
+    - "spec/dummy/**/*"
+    - "lib/generators/**/templates/**/*"
+
+# Layout and formatting
+Layout/LineLength:
+  Max: 120
+
+# Style preferences
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/HashSyntax:
+  EnforcedStyle: ruby19
+
+# Method and class length
+Metrics/MethodLength:
+  Max: 25
+
+Metrics/ClassLength:
+  Max: 150
+
+Metrics/ModuleLength:
+  Max: 150
+
+Metrics/BlockLength:
+  Max: 50
+  AllowedMethods:
+    - describe
+    - context
+    - it
+    - configure
+
+Metrics/AbcSize:
+  Max: 20
+
+# Lint
+Lint/AmbiguousOperator:
+  Enabled: true
+
+Lint/UselessAssignment:
+  Enabled: true
+
+# Custom rules for gem development
+Style/ModuleFunction:
+  Enabled: false
+
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/PerceivedComplexity:
+  Max: 10
+
+# Test-specific rules - allow constants in test blocks
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "spec/**/*"
+
+# Gemspec rules - allow development dependencies in gemspec for gems
+Gemspec/DevelopmentDependencies:
+  Enabled: false

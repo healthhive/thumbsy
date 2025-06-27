@@ -1,0 +1,47 @@
+# Database configuration for Thumbsy gem testing
+default: &default
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
+
+development:
+  <<: *default
+  adapter: sqlite3
+  database: db/development.sqlite3
+
+test:
+  <<: *default
+  adapter: sqlite3
+  database: db/test.sqlite3
+
+# PostgreSQL configuration for CI testing
+test_postgresql:
+  <<: *default
+  adapter: postgresql
+  encoding: unicode
+  database: thumbsy_test
+  username: <%= ENV.fetch("POSTGRES_USER", "postgres") %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD", "postgres") %>
+  host: <%= ENV.fetch("POSTGRES_HOST", "localhost") %>
+  port: <%= ENV.fetch("POSTGRES_PORT", 5432) %>
+
+# MySQL configuration for CI testing
+test_mysql:
+  <<: *default
+  adapter: mysql2
+  encoding: utf8mb4
+  database: thumbsy_test
+  username: <%= ENV.fetch("MYSQL_USER", "root") %>
+  password: <%= ENV.fetch("MYSQL_PASSWORD", "root") %>
+  host: <%= ENV.fetch("MYSQL_HOST", "localhost") %>
+  port: <%= ENV.fetch("MYSQL_PORT", 3306) %>
+
+# SQLite configuration for CI testing
+test_sqlite:
+  <<: *default
+  adapter: sqlite3
+  database: db/test.sqlite3
+
+production:
+  <<: *default
+  adapter: sqlite3
+  database: db/production.sqlite3

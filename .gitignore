@@ -1,0 +1,169 @@
+# Thumbsy Gem - .gitignore
+#
+# This file specifies intentionally untracked files that Git should ignore.
+# Files already tracked by Git are not affected.
+#
+# Key categories ignored:
+# - Built gem files (*.gem)
+# - Temporary and cache files
+# - IDE/Editor specific files
+# - Log files and databases
+# - Coverage reports
+# - OS generated files
+# - Development artifacts
+
+# Ruby and Gem files
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# Bundler
+/.bundle/
+/vendor/bundle
+/lib/bundler/man/
+
+# RVM / rbenv
+/.rvmrc
+/.ruby-version
+/.ruby-gemset
+
+# Documentation
+/.yardoc/
+/_yardoc/
+/doc/
+/rdoc/
+
+# IDE and Editor files
+/.vscode/
+/.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Rails specific (if used in testing)
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Coverage reports
+/coverage/
+/coverage.data
+
+# RSpec
+/spec/examples.txt
+/spec/reports/
+
+# Simplecov
+/coverage/
+
+# YARD
+/.yardoc/
+/doc/
+
+# Pry
+.pry_history
+
+# CTags
+tags
+.tags
+
+# Node modules (if any front-end tools are used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Lock files (keep Gemfile.lock for gems, but ignore others)
+package-lock.json
+yarn.lock
+
+# Build artifacts
+*.o
+*.so
+*.bundle
+
+# Local development files
+/sandbox/
+/playground/
+/scratch/
+
+# Security keys
+*.pem
+*.key
+private_key
+public_key
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Performance test outputs
+/benchmarks/
+/profiling/
+
+# Local configuration
+/config/local.yml
+/config/settings.local.yml
+/config/environments/development.local.yml
+
+# Application specific
+/app/assets/builds/
+/public/assets/
+/public/packs/
+/public/packs-test/
+/storage/
+/node_modules/
+
+# Ignore master key for decrypting credentials and more
+/config/master.key
+
+# Spring (Rails application preloader)
+/spring/*.pid
+
+# Ignore uploaded files in development
+/public/uploads/
+
+# Ignore Byebug command history file
+.byebug_history
+
+# Ignore application configuration
+/config/application.yml
