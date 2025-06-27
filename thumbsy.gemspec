@@ -27,5 +27,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rails", ">= 7.0", "< 9.0"
   spec.add_development_dependency "rack-test", "~> 2.0"
   spec.add_development_dependency "rspec-rails", "~> 6.0"
-  spec.add_development_dependency "sqlite3", "~> 1.4"
+
 end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "benchmark"
 
 RSpec.describe "Thumbsy Performance", :performance do
   USER_COUNT = 10

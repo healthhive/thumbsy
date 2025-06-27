@@ -6,7 +6,7 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 gemspec
 
 # Database adapters for CI testing
-gem "sqlite3", "~> 1.4"
+gem "sqlite3", "~> 2.1"
 
 # SQLite only for now - can add other databases later
 
