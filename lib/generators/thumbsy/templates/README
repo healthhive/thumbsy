@@ -1,0 +1,56 @@
+===============================================================================
+
+Thumbsy has been installed! 
+
+Next steps:
+
+1. Run the migration:
+   rails db:migrate
+
+2. Add thumbsy methods to your models:
+
+   # For models that can be voted on:
+   class Post < ApplicationRecord
+     votable
+   end
+
+   # For models that can vote:
+   class User < ApplicationRecord
+     voter
+   end
+
+3. Usage examples:
+
+   # Voting
+   @post.vote_up(@user)
+   @post.vote_down(@user, comment: "Not helpful")
+   
+   # Or from voter perspective:
+   @user.vote_up_for(@post)
+   @user.vote_down_for(@post, comment: "Great post!")
+
+   # Checking votes
+   @post.voted_by?(@user)
+   @post.up_voted_by?(@user)
+   @post.votes_count
+   @post.up_votes_count
+   @post.votes_score
+
+   # Getting voters
+   @post.voters
+   @post.up_voters
+   @post.down_voters
+
+   # Scopes
+   Post.with_votes
+   Post.with_up_votes
+   Post.with_down_votes
+   Post.with_comments
+
+   # Comments on votes
+   @post.votes_with_comments
+   @post.up_votes_with_comments
+
+For more information, visit: https://github.com/yourusername/thumbsy
+
+===============================================================================
