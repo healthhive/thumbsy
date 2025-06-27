@@ -14,7 +14,8 @@ gem "sqlite3", "~> 1.4"
 gem "sprockets-rails", "~> 3.4"
 
 # Rails version - dynamically set by CI matrix or default for local development
-rails_version = ENV.fetch("RAILS_VERSION", "7.1")
+# Supports Rails 7.1, 7.2, and 8.0+
+rails_version = ENV.fetch("RAILS_VERSION", "7.2")
 if rails_version == "main"
   gem "rails", github: "rails/rails", branch: "main"
 else

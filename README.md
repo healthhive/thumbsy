@@ -7,6 +7,12 @@ Includes optional JSON API endpoints.
 
 **Note**: This library was created with Claude Sonnet 4, based on the requirements specified in ORIGINAL_PROMPT.txt
 
+## Requirements
+
+- **Ruby**: 3.2.0 or newer
+- **Rails**: 7.1, 7.2, or 8.0+
+- **Database**: SQLite, PostgreSQL, or MySQL (any ActiveRecord-supported database)
+
 ## Installation
 
 ```bash
@@ -134,6 +140,55 @@ end
 - **Basic Usage**: This README
 - **API Guide**: [docs/api-guide.md](docs/api-guide.md) - Complete API documentation and integration examples
 - **Architecture Guide**: [docs/architecture-guide.md](docs/architecture-guide.md) - Technical details and design decisions
+
+## Development & Testing
+
+### Running Tests Locally
+
+```bash
+# Run the full test suite
+bundle exec rspec
+
+# Run tests with coverage report
+COVERAGE=true bundle exec rspec
+
+# Run specific test files
+bundle exec rspec spec/thumbsy_spec.rb
+bundle exec rspec spec/api_integration_spec.rb
+```
+
+### Testing Across Rails Versions
+
+Thumbsy is tested against multiple Rails versions (7.1, 7.2, 8.0) and Ruby versions (3.2, 3.3, 3.4):
+
+```bash
+# Test with a specific Rails version
+RAILS_VERSION=8.0 bundle update rails
+RAILS_VERSION=8.0 bundle exec rspec
+
+# Use the automated test script
+ruby script/test_rails_versions.rb
+```
+
+### Continuous Integration
+
+Our CI pipeline automatically tests all supported combinations:
+
+- **Ruby versions**: 3.2, 3.3, 3.4
+- **Rails versions**: 7.1, 7.2, 8.0
+- **Total combinations**: 9 test matrices
+- **Coverage requirement**: 78%+
+
+All tests must pass across all combinations before any changes are merged.
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for your changes
+4. Ensure all tests pass: `bundle exec rspec`
+5. Test across Rails versions: `ruby script/test_rails_versions.rb`
+6. Submit a pull request
 
 ## License
 

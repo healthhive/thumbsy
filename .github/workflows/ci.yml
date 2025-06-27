@@ -1,7 +1,7 @@
 name: CI
 
 # Simplified CI focused on essential validations:
-# 1. Comprehensive test suite across Ruby/Rails versions
+# 1. Comprehensive test suite across Ruby/Rails versions (7.1, 7.2, 8.0)
 # 2. Performance testing and memory usage verification
 # This ensures core functionality and performance without
 # overwhelming complexity in the CI pipeline.
@@ -14,16 +14,24 @@ on:
 
 jobs:
   test:
+    name: "Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         ruby-version:
+          - "3.2"
           - "3.3"
           - "3.4"
         rails-version:
           - "7.1"
           - "7.2"
+          - "8.0"
+        # Ruby/Rails compatibility:
+        # Rails 8.0: Ruby 3.2+ (all our Ruby versions supported)
+        # Rails 7.2: Ruby 3.1+ (all our Ruby versions supported)
+        # Rails 7.1: Ruby 2.7+ (all our Ruby versions supported)
+        # Total combinations: 9 (3 Ruby × 3 Rails versions)
 
     env:
       RAILS_VERSION: ${{ matrix.rails-version }}
@@ -49,18 +57,20 @@ jobs:
             ${{ runner.os }}-gems-${{ matrix.ruby-version }}-
             ${{ runner.os }}-gems-
 
-      - name: Install dependencies
+      - name: Install dependencies (Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }})
         run: |
           gem install bundler
           bundle config path vendor/bundle
           bundle install --jobs 4 --retry 3
 
-      - name: Run all tests
+      - name: Run test suite with coverage
         run: |
           mkdir -p tmp
-          bundle exec rspec --format progress --format RspecJunitFormatter --out tmp/rspec.xml
+          echo "🧪 Running Thumbsy test suite..."
+          echo "Ruby: ${{ matrix.ruby-version }}, Rails: ${{ matrix.rails-version }}"
+          COVERAGE=true bundle exec rspec --format progress --format RspecJunitFormatter --out tmp/rspec.xml
 
-      - name: Upload test results
+      - name: Upload test results and coverage
         uses: actions/upload-artifact@v4
         if: always()
         with:

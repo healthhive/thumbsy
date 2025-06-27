@@ -4,21 +4,21 @@ Gem::Specification.new do |spec|
   spec.name          = "thumbsy"
   spec.version       = "1.0.0"
   spec.authors       = ["Tiago"]
-  spec.email         = ["tiago@example.com"]
+  spec.email         = ["development@healthhive.org"]
 
   spec.summary       = "A Rails gem for adding voting/liking functionality to ActiveRecord models"
   spec.description   = "Thumbsy provides an easy way to add thumbs up/down or like/dislike functionality " \
                        "to your Rails models with comments support"
-  spec.homepage      = "https://github.com/yourusername/thumbsy"
+  spec.homepage      = "https://github.com/healthhive/thumbsy"
   spec.license       = "MIT"
-  spec.required_ruby_version = Gem::Requirement.new(">= 3.3.0")
+  spec.required_ruby_version = Gem::Requirement.new(">= 3.2.0")
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/yourusername/thumbsy.git"
-  spec.metadata["changelog_uri"] = "https://github.com/yourusername/thumbsy/blob/main/docs/changelog.md"
-  spec.metadata["documentation_uri"] = "https://github.com/yourusername/thumbsy/blob/main/docs/api-guide.md"
-  spec.metadata["bug_tracker_uri"] = "https://github.com/yourusername/thumbsy/issues"
+  spec.metadata["source_code_uri"] = "https://github.com/healthhive/thumbsy.git"
+  spec.metadata["changelog_uri"] = "https://github.com/healthhive/thumbsy/blob/main/docs/changelog.md"
+  spec.metadata["documentation_uri"] = "https://github.com/healthhive/thumbsy/blob/main/docs/api-guide.md"
+  spec.metadata["bug_tracker_uri"] = "https://github.com/healthhive/thumbsy/issues"
   spec.metadata["rubygems_mfa_required"] = "true"
 
   spec.files = Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
