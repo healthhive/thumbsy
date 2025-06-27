@@ -20,6 +20,18 @@ RSpec.describe "Thumbsy API", :api do
   let(:book) { Book.create!(title: "Test Book") }
 
   # Global configuration reset to ensure test isolation
+  before(:each) do
+    # Reset configuration before each test
+    Thumbsy::Api.configure do |config|
+      config.require_authentication = true
+      config.require_authorization = false
+      config.authentication_method = nil
+      config.current_voter_method = nil
+      config.authorization_method = nil
+      config.voter_serializer = nil
+    end
+  end
+
   after(:each) do
     # Reset configuration after each test
     Thumbsy::Api.configure do |config|
@@ -345,6 +357,132 @@ RSpec.describe "Thumbsy API", :api do
         expect(result[:serializer][:thread_safe]).to be true
         expect(result[:serializer][:id]).to eq(user.id)
       end
+    end
+  end
+
+  describe "API Configuration Persistence" do
+    it "persists authentication configuration" do
+      Thumbsy::Api.configure do |config|
+        config.require_authentication = false
+      end
+
+      expect(Thumbsy::Api.require_authentication).to be false
+    end
+
+    it "persists authorization configuration" do
+      Thumbsy::Api.configure do |config|
+        config.require_authorization = true
+      end
+
+      expect(Thumbsy::Api.require_authorization).to be true
+    end
+
+    it "persists method configurations" do
+      auth_method = -> { "test auth" }
+      voter_method = -> { "test voter" }
+      authz_method = -> { "test authz" }
+      serializer = -> { "test serializer" }
+
+      Thumbsy::Api.configure do |config|
+        config.authentication_method = auth_method
+        config.current_voter_method = voter_method
+        config.authorization_method = authz_method
+        config.voter_serializer = serializer
+      end
+
+      expect(Thumbsy::Api.authentication_method).to eq(auth_method)
+      expect(Thumbsy::Api.current_voter_method).to eq(voter_method)
+      expect(Thumbsy::Api.authorization_method).to eq(authz_method)
+      expect(Thumbsy::Api.voter_serializer).to eq(serializer)
+    end
+  end
+
+  describe "API Exception Classes" do
+    it "defines AuthenticationError correctly" do
+      error = Thumbsy::Api::AuthenticationError.new("Auth failed")
+      expect(error).to be_a(StandardError)
+      expect(error.message).to eq("Auth failed")
+    end
+
+    it "defines AuthorizationError correctly" do
+      error = Thumbsy::Api::AuthorizationError.new("Access denied")
+      expect(error).to be_a(StandardError)
+      expect(error.message).to eq("Access denied")
+    end
+
+    it "can raise and catch AuthenticationError" do
+      expect do
+        raise Thumbsy::Api::AuthenticationError, "Custom auth error"
+      end.to raise_error(Thumbsy::Api::AuthenticationError, "Custom auth error")
+    end
+
+    it "can raise and catch AuthorizationError" do
+      expect do
+        raise Thumbsy::Api::AuthorizationError, "Custom authz error"
+      end.to raise_error(Thumbsy::Api::AuthorizationError, "Custom authz error")
+    end
+  end
+
+  describe "API Method Execution" do
+    it "executes authentication method when configured" do
+      executed = false
+      Thumbsy::Api.configure do |config|
+        config.authentication_method = -> { executed = true; "authenticated" }
+      end
+
+      result = Thumbsy::Api.authentication_method.call
+      expect(executed).to be true
+      expect(result).to eq("authenticated")
+    end
+
+    it "executes current voter method when configured" do
+      Thumbsy::Api.configure do |config|
+        config.current_voter_method = -> { user }
+      end
+
+      result = Thumbsy::Api.current_voter_method.call
+      expect(result).to eq(user)
+    end
+
+    it "executes authorization method when configured" do
+      Thumbsy::Api.configure do |config|
+        config.authorization_method = ->(votable, voter) { votable.present? && voter.present? }
+      end
+
+      result = Thumbsy::Api.authorization_method.call(book, user)
+      expect(result).to be true
+
+      result = Thumbsy::Api.authorization_method.call(nil, user)
+      expect(result).to be false
+    end
+
+    it "executes voter serializer when configured" do
+      Thumbsy::Api.configure do |config|
+        config.voter_serializer = ->(voter) { { custom_id: voter.id, custom_name: voter.name } }
+      end
+
+      result = Thumbsy::Api.voter_serializer.call(user)
+      expect(result[:custom_id]).to eq(user.id)
+      expect(result[:custom_name]).to eq(user.name)
+    end
+  end
+
+  describe "Engine and Loading" do
+    it "has load! method" do
+      expect(Thumbsy::Api).to respond_to(:load!)
+    end
+
+    it "has configure method" do
+      expect(Thumbsy::Api).to respond_to(:configure)
+    end
+
+    it "configure method yields the module" do
+      yielded_object = nil
+      Thumbsy::Api.configure do |config|
+        yielded_object = config
+      end
+
+      expect(yielded_object).to eq(Thumbsy::Api)
     end
   end
 

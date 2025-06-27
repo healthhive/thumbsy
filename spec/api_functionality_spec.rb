@@ -26,11 +26,11 @@ RSpec.describe "Thumbsy API Components", :api do
       nil
     end
 
-    it "has API components available when loaded", skip: !defined?(Thumbsy::Api) do
+    it "has API components available when loaded" do
       expect(defined?(Thumbsy::Api)).to be_truthy
     end
 
-    it "can be configured when API is available", skip: !defined?(Thumbsy::Api) do
+    it "can be configured when API is available" do
       expect do
         Thumbsy::Api.configure do |config|
           config.require_authentication = false

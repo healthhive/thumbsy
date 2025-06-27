@@ -18,6 +18,59 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
   let(:book) { Book.create!(title: "The Great Gatsby") }
   let(:book2) { Book.create!(title: "To Kill a Mockingbird") }
 
+  describe "Version and Core Setup" do
+    it "has a version number" do
+      expect(Thumbsy::VERSION).not_to be nil
+      expect(Thumbsy::VERSION).to match(/\d+\.\d+\.\d+/)
+    end
+
+    it "extends ActiveRecord::Base with Extension module" do
+      expect(ActiveRecord::Base.ancestors).to include(Thumbsy::Extension)
+    end
+
+    it "adds votable class method" do
+      expect(ActiveRecord::Base).to respond_to(:votable)
+    end
+
+    it "adds voter class method" do
+      expect(ActiveRecord::Base).to respond_to(:voter)
+    end
+  end
+
+  describe "Module Integration" do
+    it "includes Thumbsy::Votable when votable is called" do
+      test_class = Class.new(ActiveRecord::Base) do
+        self.table_name = "books"
+        votable
+      end
+
+      expect(test_class.ancestors).to include(Thumbsy::Votable)
+    end
+
+    it "includes Thumbsy::Voter when voter is called" do
+      test_class = Class.new(ActiveRecord::Base) do
+        self.table_name = "users"
+        voter
+      end
+
+      expect(test_class.ancestors).to include(Thumbsy::Voter)
+    end
+
+    it "sets up votable associations correctly" do
+      expect(book.class.reflect_on_association(:thumbsy_votes)).to be_present
+      association = book.class.reflect_on_association(:thumbsy_votes)
+      expect(association.macro).to eq(:has_many)
+      expect(association.options[:as]).to eq(:votable)
+    end
+
+    it "sets up voter associations correctly" do
+      expect(user.class.reflect_on_association(:thumbsy_votes)).to be_present
+      association = user.class.reflect_on_association(:thumbsy_votes)
+      expect(association.macro).to eq(:has_many)
+      expect(association.options[:as]).to eq(:voter)
+    end
+  end
+
   describe "Basic Voting Functionality" do
     describe "voting up" do
       it "allows a user to vote up on a book" do
@@ -249,30 +302,69 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       book2.vote_down(user2)
       # book3 has no votes
       @book3 = Book.create!(title: "Book Without Votes")
+      # book4 has votes but no comments
+      @book4 = Book.create!(title: "No comments book")
+      @book4.vote_up(user2)
     end
 
     it "provides vote scopes" do
       books_with_votes = Book.with_votes
-      expect(books_with_votes).to include(book, book2)
+      expect(books_with_votes).to include(book, book2, @book4)
       expect(books_with_votes).not_to include(@book3)
     end
 
     it "provides up vote scopes" do
       books_with_up_votes = Book.with_up_votes
-      expect(books_with_up_votes).to include(book)
+      expect(books_with_up_votes).to include(book, @book4)
       expect(books_with_up_votes).not_to include(book2, @book3)
     end
 
     it "provides down vote scopes" do
       books_with_down_votes = Book.with_down_votes
       expect(books_with_down_votes).to include(book2)
-      expect(books_with_down_votes).not_to include(book, @book3)
+      expect(books_with_down_votes).not_to include(book, @book3, @book4)
     end
 
     it "provides comment scopes" do
       books_with_comments = Book.with_comments
       expect(books_with_comments).to include(book)
-      expect(books_with_comments).not_to include(book2, @book3)
+      expect(books_with_comments).not_to include(book2, @book3, @book4)
+    end
+
+    it "excludes empty comments" do
+      empty_book = Book.create!(title: "Empty comment book")
+      empty_book.vote_up(user, comment: "")
+
+      books_with_comments = Book.with_comments
+      expect(books_with_comments).not_to include(empty_book)
+    end
+
+    it "excludes nil comments" do
+      nil_book = Book.create!(title: "Nil comment book")
+      nil_book.vote_up(user, comment: nil)
+
+      books_with_comments = Book.with_comments
+      expect(books_with_comments).not_to include(nil_book)
+    end
+
+    it "handles objects with only down votes correctly" do
+      down_only_book = Book.create!(title: "Down only")
+      down_only_book.vote_down(user)
+
+      books_with_up_votes = Book.with_up_votes
+      expect(books_with_up_votes).not_to include(down_only_book)
+
+      books_with_down_votes = Book.with_down_votes
+      expect(books_with_down_votes).to include(down_only_book)
+    end
+
+    it "maintains scope distinctness with joins" do
+      # Test that scopes return distinct results even with joins
+      books_with_votes = Book.with_votes.distinct
+      books_with_comments = Book.with_comments.distinct
+
+      expect(books_with_votes.count).to be >= 1
+      expect(books_with_comments.count).to be >= 1
     end
   end
 
@@ -297,6 +389,35 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       invalid_voter = NonVoterItem.new
       result = book.vote_up(invalid_voter)
       expect(result).to be false
+    end
+
+    it "handles voter without thumbsy_votes capability" do
+      # Create an object that doesn't have voter functionality
+      invalid_voter = Object.new
+
+      result = book.vote_up(invalid_voter)
+      expect(result).to be false
+
+      result = book.vote_down(invalid_voter)
+      expect(result).to be false
+    end
+
+    it "handles votable without thumbsy_votes capability from voter perspective" do
+      # Create an object that doesn't have votable functionality
+      invalid_votable = Object.new
+
+      result = user.vote_up_for(invalid_votable)
+      expect(result).to be false
+
+      result = user.vote_down_for(invalid_votable)
+      expect(result).to be false
+
+      result = user.remove_vote_for(invalid_votable)
+      expect(result).to be false
+
+      expect(user.voted_for?(invalid_votable)).to be false
+      expect(user.up_voted_for?(invalid_votable)).to be false
+      expect(user.down_voted_for?(invalid_votable)).to be false
     end
 
     it "handles finding vote that doesn't exist" do
@@ -325,6 +446,88 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       # Nil comments shouldn't appear in with_comments scope
       expect(book.votes_with_comments).not_to include(vote)
     end
+
+    it "verifies all query methods work with empty states" do
+      # Test all query methods on object with no votes
+      empty_book = Book.create!(title: "Empty Book")
+
+      expect(empty_book.voted_by?(user)).to be false
+      expect(empty_book.up_voted_by?(user)).to be false
+      expect(empty_book.down_voted_by?(user)).to be false
+      expect(empty_book.vote_by(user)).to be_nil
+      expect(empty_book.votes_count).to eq(0)
+      expect(empty_book.up_votes_count).to eq(0)
+      expect(empty_book.down_votes_count).to eq(0)
+      expect(empty_book.votes_score).to eq(0)
+      expect(empty_book.votes_with_comments).to be_empty
+      expect(empty_book.up_votes_with_comments).to be_empty
+      expect(empty_book.down_votes_with_comments).to be_empty
+    end
+
+    it "verifies voter query methods with empty states" do
+      # Test voter methods when they haven't voted on anything
+      new_user = User.create!(name: "New User")
+
+      expect(new_user.voted_for(Book)).to be_empty
+      expect(new_user.up_voted_for_class(Book)).to be_empty
+      expect(new_user.down_voted_for_class(Book)).to be_empty
+      expect(new_user.voted_for?(book)).to be false
+      expect(new_user.up_voted_for?(book)).to be false
+      expect(new_user.down_voted_for?(book)).to be false
+    end
+
+    it "handles remove_vote return values correctly" do
+      # Test when vote exists
+      book.vote_up(user)
+      result = book.remove_vote(user)
+      # remove_vote uses destroy_all which returns an array, truthy but not boolean true
+      expect(result).to be_truthy
+
+      # Test when no vote exists
+      result = book.remove_vote(user2)
+      # destroy_all returns empty array when nothing to destroy, still truthy
+      expect(result).to be_truthy
+    end
+
+    it "handles destroy_all return values in remove_vote" do
+      # Test the actual return value semantics of remove_vote
+      book.vote_up(user)
+
+      # remove_vote calls destroy_all, which returns the destroyed records
+      destroyed_votes = book.remove_vote(user)
+      expect(destroyed_votes).to be_an(Array)
+      expect(destroyed_votes).not_to be_empty
+
+      # Calling again should return empty array but still truthy
+      destroyed_votes_again = book.remove_vote(user)
+      expect(destroyed_votes_again).to be_an(Array)
+      expect(destroyed_votes_again).to be_empty
+      expect(destroyed_votes_again).to be_truthy # Empty array is truthy in Ruby
+    end
+
+    it "verifies association dependent destroy behavior" do
+      # Test that destroying votable destroys votes
+      test_book = Book.create!(title: "Test Book for Destruction")
+      vote = test_book.vote_up(user, comment: "Will be destroyed")
+      vote_id = vote.id
+
+      test_book.destroy
+
+      # Vote should be destroyed due to dependent: :destroy
+      expect { ThumbsyVote.find(vote_id) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "verifies voter association dependent destroy behavior" do
+      # Test that destroying voter destroys their votes
+      test_user = User.create!(name: "Test User for Destruction")
+      vote = book.vote_up(test_user, comment: "Will be destroyed")
+      vote_id = vote.id
+
+      test_user.destroy
+
+      # Vote should be destroyed due to dependent: :destroy
+      expect { ThumbsyVote.find(vote_id) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
   end
 
   describe "Vote Model Behavior" do
@@ -349,6 +552,73 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
     it "has timestamps" do
       expect(vote.created_at).to be_present
       expect(vote.updated_at).to be_present
+    end
+
+    it "stores comments correctly" do
+      up_vote = book.vote_up(user, comment: "Good")
+      down_vote = book.vote_down(user2, comment: "Bad")
+
+      expect(up_vote.comment).to eq("Good")
+      expect(down_vote.comment).to eq("Bad")
+    end
+
+    describe "vote model scopes" do
+      before do
+        book.vote_up(user, comment: "Up with comment")
+        book.vote_down(user2, comment: "Down with comment")
+        book2.vote_up(user2) # No comment
+      end
+
+      it "up_votes scope works" do
+        up_votes = ThumbsyVote.up_votes
+        expect(up_votes.count).to eq(2)
+        expect(up_votes.all? { |v| v.vote == true }).to be true
+      end
+
+      it "down_votes scope works" do
+        down_votes = ThumbsyVote.down_votes
+        expect(down_votes.count).to eq(1)
+        expect(down_votes.all? { |v| v.vote == false }).to be true
+      end
+
+      it "with_comments scope works" do
+        votes_with_comments = ThumbsyVote.with_comments
+        expect(votes_with_comments.count).to eq(2)
+        expect(votes_with_comments.all? { |v| v.comment.present? }).to be true
+      end
+    end
+
+    describe "vote model validations" do
+      it "requires votable" do
+        vote = ThumbsyVote.new(voter: user, vote: true)
+        expect(vote.valid?).to be false
+        expect(vote.errors[:votable]).to include("can't be blank")
+      end
+
+      it "requires voter" do
+        vote = ThumbsyVote.new(votable: book, vote: true)
+        expect(vote.valid?).to be false
+        expect(vote.errors[:voter]).to include("can't be blank")
+      end
+
+      it "requires vote to be boolean" do
+        vote = ThumbsyVote.new(votable: book, voter: user, vote: nil)
+        expect(vote.valid?).to be false
+        expect(vote.errors[:vote]).to be_present
+      end
+
+      it "prevents duplicate votes" do
+        book.vote_up(user)
+
+        duplicate_vote = ThumbsyVote.new(
+          votable: book,
+          voter: user,
+          vote: false
+        )
+
+        expect(duplicate_vote.valid?).to be false
+        expect(duplicate_vote.errors[:voter_id]).to include("has already been taken")
+      end
     end
   end
 
@@ -380,6 +650,137 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
 
       voted_books = user.voted_for(Book)
       expect(voted_books).to include(book, book2)
+    end
+  end
+
+  describe "Complex Comment Scenarios" do
+    it "handles multiline comments" do
+      multiline_comment = "This is a\nmultiline\ncomment"
+      vote = book.vote_up(user, comment: multiline_comment)
+
+      expect(vote.comment).to eq(multiline_comment)
+      expect(book.votes_with_comments).to include(vote)
+    end
+
+    it "handles unicode comments" do
+      unicode_comment = "Unicode test: café, naïve, résumé, 🎉"
+      vote = book.vote_up(user, comment: unicode_comment)
+
+      expect(vote.comment).to eq(unicode_comment)
+    end
+
+    it "handles very long comments" do
+      long_comment = "x" * 1000
+      vote = book.vote_up(user, comment: long_comment)
+
+      expect(vote.comment).to eq(long_comment)
+      expect(vote.comment.length).to eq(1000)
+    end
+  end
+
+  describe "Advanced Vote Scenarios" do
+    it "handles vote update vs create scenarios" do
+      # First vote - should create
+      vote1 = book.vote_up(user, comment: "First comment")
+      expect(vote1).to be_persisted
+      expect(vote1.comment).to eq("First comment")
+
+      # Second vote - should update existing
+      vote2 = book.vote_down(user, comment: "Changed mind")
+      expect(vote2.id).to eq(vote1.id) # Same vote object
+      expect(vote2.comment).to eq("Changed mind")
+      expect(vote2.vote).to be false
+
+      # Verify only one vote exists
+      expect(book.votes_count).to eq(1)
+    end
+
+    it "handles vote creation edge cases" do
+      # Test with nil comment explicitly
+      vote = book.vote_up(user, comment: nil)
+      expect(vote.comment).to be_nil
+
+      # Test comment updates to nil
+      book.vote_down(user, comment: nil)
+      updated_vote = book.vote_by(user)
+      expect(updated_vote.comment).to be_nil
+    end
+
+    it "correctly counts when same user votes multiple times" do
+      # User changes vote multiple times
+      book.vote_up(user)
+      expect(book.votes_count).to eq(1)
+
+      book.vote_down(user)
+      expect(book.votes_count).to eq(1)
+      expect(book.up_votes_count).to eq(0)
+      expect(book.down_votes_count).to eq(1)
+
+      book.vote_up(user)
+      expect(book.votes_count).to eq(1)
+      expect(book.up_votes_count).to eq(1)
+      expect(book.down_votes_count).to eq(0)
+    end
+
+    it "correctly calculates score with mixed votes" do
+      # Create a scenario with mixed votes
+      users = 5.times.map { |i| User.create!(name: "User #{i}") }
+
+      # 3 up votes, 2 down votes
+      users[0..2].each { |u| book.vote_up(u) }
+      users[3..4].each { |u| book.vote_down(u) }
+
+      expect(book.votes_count).to eq(5)
+      expect(book.up_votes_count).to eq(3)
+      expect(book.down_votes_count).to eq(2)
+      expect(book.votes_score).to eq(1) # 3 - 2 = 1
+
+      # Cleanup
+      users.each(&:destroy)
+    end
+  end
+
+  describe "Cross-Model Voting" do
+    before do
+      # Create another votable model type
+      class Article < ActiveRecord::Base
+        self.table_name = "books" # Reuse table
+        votable
+      end
+    end
+
+    let(:article) { Article.create!(title: "Test Article") }
+
+    it "handles voting across different model types" do
+      book.vote_up(user)
+      article.vote_down(user)
+
+      expect(user.voted_for?(book)).to be true
+      expect(user.voted_for?(article)).to be true
+      expect(user.up_voted_for?(book)).to be true
+      expect(user.down_voted_for?(article)).to be true
+    end
+
+    it "maintains separate vote counts per model type" do
+      book.vote_up(user)
+      book.vote_up(user2)
+      article.vote_up(user)
+
+      expect(book.votes_count).to eq(2)
+      expect(article.votes_count).to eq(1)
+    end
+
+    it "returns correct objects by class" do
+      book.vote_up(user)
+      article.vote_up(user)
+
+      voted_books = user.voted_for(Book)
+      voted_articles = user.voted_for(Article)
+
+      expect(voted_books).to include(book)
+      expect(voted_books).not_to include(article)
+      expect(voted_articles).to include(article)
+      expect(voted_articles).not_to include(book)
     end
   end
 end

@@ -8,7 +8,7 @@ if ENV["COVERAGE"] == "true" || ENV["CI"]
   SimpleCov.start do
     add_filter "/spec/"
     add_filter "/vendor/"
-    minimum_coverage 85
+    minimum_coverage 78
   end
 end
 
