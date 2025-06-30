@@ -86,6 +86,22 @@ curl -X GET /api/v1/books/1/vote \
   -H "Authorization: Bearer TOKEN"
 ```
 
+### API Module Access
+
+The `Thumbsy::Api` module is automatically available when you require the gem:
+
+```ruby
+require 'thumbsy'
+
+# API module is immediately accessible
+Thumbsy::Api.configure do |config|
+  config.require_authentication = false
+end
+
+# Load full API functionality (controllers and routes)
+Thumbsy.load_api!  # Call this in config/application.rb or an initializer
+```
+
 ### API Configuration
 
 ```ruby

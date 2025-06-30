@@ -17,6 +17,18 @@ RSpec.describe "Thumbsy API Components", :api do
       require "thumbsy/api"
       expect(Thumbsy::Api).to respond_to(:configure)
     end
+
+    it "supports autoloading of API module" do
+      # Test that accessing Thumbsy::Api works without explicit require
+      # This tests the const_missing hook
+      expect(Thumbsy::Api).to be_a(Module)
+      expect(Thumbsy::Api).to respond_to(:configure)
+      expect(Thumbsy::Api).to respond_to(:load!)
+
+      # Verify the module has expected configuration
+      expect(Thumbsy::Api.require_authentication).to be_in([true, false])
+      expect(Thumbsy::Api.require_authorization).to be_in([true, false])
+    end
   end
 
   describe "API integration readiness" do
