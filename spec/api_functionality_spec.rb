@@ -29,6 +29,36 @@ RSpec.describe "Thumbsy API Components", :api do
       expect(Thumbsy::Api.require_authentication).to be_in([true, false])
       expect(Thumbsy::Api.require_authorization).to be_in([true, false])
     end
+
+    it "allows user scenario: require thumbsy and immediately use Api" do
+      # This simulates what users actually do in their Rails applications
+      # They require 'thumbsy' and immediately try to configure the API
+
+      # This should work without any explicit require statements
+      expect(Thumbsy::Api).to be_a(Module)
+
+      # Users should be able to configure immediately
+      expect do
+        Thumbsy::Api.configure do |config|
+          config.require_authentication = false
+          config.require_authorization = true
+        end
+      end.not_to raise_error
+
+      # Verify configuration took effect
+      expect(Thumbsy::Api.require_authentication).to be false
+      expect(Thumbsy::Api.require_authorization).to be true
+
+      # Users should be able to access exception classes
+      expect(Thumbsy::Api::AuthenticationError).to be < StandardError
+      expect(Thumbsy::Api::AuthorizationError).to be < StandardError
+
+      # Reset for other tests
+      Thumbsy::Api.configure do |config|
+        config.require_authentication = true
+        config.require_authorization = false
+      end
+    end
   end
 
   describe "API integration readiness" do
