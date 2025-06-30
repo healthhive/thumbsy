@@ -37,6 +37,44 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
     end
   end
 
+  describe "Module Configuration and Loading" do
+    it "supports configure method with block" do
+      original_value = Thumbsy.vote_model_name
+
+      Thumbsy.configure do |config|
+        config.vote_model_name = "CustomVote"
+      end
+
+      expect(Thumbsy.vote_model_name).to eq("CustomVote")
+
+      # Reset to original
+      Thumbsy.vote_model_name = original_value
+    end
+
+    it "supports load_api! method" do
+      # This may raise an error in non-Rails environments, which is expected
+      begin
+        Thumbsy.load_api!
+        # If it succeeds, Api should be available
+        expect(defined?(Thumbsy::Api)).to be_truthy
+      rescue NameError => e
+        # Expected in non-Rails environments when ActionController::API is not available
+        expect(e.message).to include("ActionController::API")
+      end
+    end
+
+    it "handles const_missing for unknown constants" do
+      expect { Thumbsy::UnknownConstant }.to raise_error(NameError)
+    end
+
+    it "autoloads Api module via const_missing" do
+      # Test that accessing Api loads it successfully
+      # This works because Api is autoloaded when accessed
+      expect(Thumbsy::Api).to be_a(Module)
+      expect(Thumbsy::Api.respond_to?(:configure)).to be_truthy
+    end
+  end
+
   describe "Module Integration" do
     it "includes Thumbsy::Votable when votable is called" do
       test_class = Class.new(ActiveRecord::Base) do
