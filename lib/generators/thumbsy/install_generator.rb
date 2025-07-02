@@ -15,7 +15,10 @@ module Thumbsy
         ActiveRecord::Migration.next_migration_number(next_migration_number)
       end
 
+      class_option :id_type, type: :string, default: :uuid, desc: "ID type for primary keys (uuid, bigint, or integer)"
+
       def create_migration_file
+        @id_type = options[:id_type].to_sym
         migration_template "create_thumbsy_votes.rb", "db/migrate/create_thumbsy_votes.rb"
       end
 
