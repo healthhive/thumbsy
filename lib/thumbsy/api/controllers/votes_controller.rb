@@ -10,7 +10,7 @@ module Thumbsy
       def vote_up
         vote = @votable.vote_up(current_voter, comment: vote_params[:comment])
 
-        if vote&.persisted?
+        if vote
           render_success(vote_data(vote), :created)
         else
           render_error("Failed to create vote", :unprocessable_entity)
@@ -20,8 +20,7 @@ module Thumbsy
       # POST /votes/vote_down
       def vote_down
         vote = @votable.vote_down(current_voter, comment: vote_params[:comment])
-
-        if vote&.persisted?
+        if vote
           render_success(vote_data(vote), :created)
         else
           render_error("Failed to create vote", :unprocessable_entity)

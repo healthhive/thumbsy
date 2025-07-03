@@ -33,8 +33,8 @@ rails db:migrate
 Thumbsy supports different primary key types to match your application's needs:
 
 ```bash
-# Use UUIDs (default, recommended for distributed systems)
-rails generate thumbsy:install --id_type=uuid
+# Default ID type is UUID (recommended for distributed systems)
+rails generate thumbsy:install
 
 # Use big integers (recommended for high-volume applications)
 rails generate thumbsy:install --id_type=bigint
