@@ -13,7 +13,7 @@ Perfect for traditional Rails apps with server-rendered views:
 ```bash
 gem 'thumbsy'
 bundle install
-rails generate thumbsy:install
+rails generate thumbsy:install # defaults to --id_type=uuid
 rails db:migrate
 ```
 
@@ -26,12 +26,24 @@ For API-driven applications, mobile backends, or hybrid apps:
 ```bash
 gem 'thumbsy'
 bundle install
-rails generate thumbsy:install
+rails generate thumbsy:install # defaults to --id_type=uuid
 rails generate thumbsy:api
 rails db:migrate
 ```
 
 Result: ~400 lines of code, ActiveRecord methods + JSON API endpoints
+
+### ID Type Configuration
+
+Choose the appropriate ID type for your application:
+
+```bash
+# Default ID type is UUID (recommended for distributed systems)
+rails generate thumbsy:install
+
+# BIGINT - Recommended for high-volume traditional Rails apps
+rails generate thumbsy:install --id_type=bigint
+```
 
 ## API Routes
 

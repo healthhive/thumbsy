@@ -28,6 +28,22 @@ rails generate thumbsy:install
 rails db:migrate
 ```
 
+### ID Type Configuration
+
+Thumbsy supports different primary key types to match your application's needs:
+
+```bash
+# Default ID type is UUID (recommended for distributed systems)
+rails generate thumbsy:install
+
+# Use big integers (recommended for high-volume applications)
+rails generate thumbsy:install --id_type=bigint
+```
+
+The ID type affects:
+- Primary key of the `thumbsy_votes` table
+- Foreign key references to votable and voter models
+
 ```ruby
 # Add to your models
 class Book < ApplicationRecord

@@ -1,22 +1,28 @@
 # Thumbsy API Configuration
 # Configure the voting API to work with your authentication system
 
+require 'thumbsy/api'
+require 'thumbsy/api/engine'
+
+# Load API components
+Thumbsy::Api.load!
+
 Thumbsy::Api.configure do |config|
   # Authentication settings
   config.require_authentication = true
-  
+
   # Define how to authenticate users
   # Example for Devise:
   config.authentication_method = proc do
     authenticate_user! # Your authentication method
   end
-  
+
   # Define how to get the current voter
   # Example for Devise:
   config.current_voter_method = proc do
     current_user # Your current user method
   end
-  
+
   # Authorization (optional)
   # config.require_authorization = true
   # config.authorization_method = proc do |votable, voter|
@@ -30,7 +36,7 @@ Thumbsy::Api.configure do |config|
   #     true
   #   end
   # end
-  
+
   # Custom voter serialization for API responses
   # config.voter_serializer = proc do |voter|
   #   {
@@ -39,7 +45,7 @@ Thumbsy::Api.configure do |config|
   #     avatar: voter.avatar.attached? ? rails_blob_url(voter.avatar) : nil
   #   }
   # end
-  
+
   # Vote model name (if you want to customize)
   # config.vote_model_name = "CustomVote"
 end
