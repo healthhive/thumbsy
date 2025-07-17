@@ -8,10 +8,11 @@ module Thumbsy
 
       # POST /votes/vote_up
       def vote_up
-        vote = @votable.vote_up(current_voter, comment: vote_params[:comment])
+        vote = @votable.vote_up(current_voter, comment: vote_params[:comment],
+                                               feedback_option: vote_params[:feedback_option])
 
-        if vote
-          render_success(vote_data(vote), :created)
+        if vote&.persisted?
+          render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json, :created)
         else
           render_error("Failed to create vote", :unprocessable_entity)
         end
@@ -19,9 +20,11 @@ module Thumbsy
 
       # POST /votes/vote_down
       def vote_down
-        vote = @votable.vote_down(current_voter, comment: vote_params[:comment])
-        if vote
-          render_success(vote_data(vote), :created)
+        vote = @votable.vote_down(current_voter, comment: vote_params[:comment],
+                                                 feedback_option: vote_params[:feedback_option])
+
+        if vote&.persisted?
+          render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json, :created)
         else
           render_error("Failed to create vote", :unprocessable_entity)
         end
@@ -63,7 +66,7 @@ module Thumbsy
       def index
         votes = filtered_votes
         data = {
-          votes: votes.map { |vote| vote_data(vote) },
+          votes: votes.map { |vote| Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json },
           summary: vote_summary,
         }
 
@@ -108,29 +111,7 @@ module Thumbsy
       end
 
       def vote_params
-        params.permit(:comment, :votable_type, :votable_id)
-      end
-
-      def vote_data(vote)
-        {
-          id: vote.id,
-          vote_type: vote.up_vote? ? "up" : "down",
-          comment: vote.comment,
-          voter: voter_data(vote.voter),
-          created_at: vote.created_at,
-          updated_at: vote.updated_at,
-        }
-      end
-
-      def voter_data(voter)
-        if Thumbsy::Api.voter_serializer
-          instance_exec(voter, &Thumbsy::Api.voter_serializer)
-        else
-          {
-            id: voter.id,
-            type: voter.class.name,
-          }
-        end
+        params.permit(:comment, :feedback_option, :votable_type, :votable_id)
       end
     end
   end

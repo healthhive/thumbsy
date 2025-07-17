@@ -113,7 +113,7 @@ COVERAGE=true bundle exec rspec
 bundle exec rspec spec/basic_functionality_spec.rb
 
 # Run only API tests (if API is loaded)
-bundle exec rspec spec/api_functionality_spec.rb
+bundle exec rspec spec/api_integration_spec.rb
 
 # Run performance tests
 bundle exec rspec spec/performance_spec.rb --tag performance

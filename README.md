@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/yourusername/thumbsy/workflows/CI/badge.svg)](https://github.com/yourusername/thumbsy/actions)
 
-A Rails gem for adding thumbs up/down voting functionality with comments.
+A Rails gem for adding thumbs up/down voting functionality with comments and feedback options.
 Includes optional JSON API endpoints.
 
 **Note**: This library was created with Claude Sonnet 4, based on the requirements specified in ORIGINAL_PROMPT.txt
@@ -15,10 +15,31 @@ Includes optional JSON API endpoints.
 
 ## Installation
 
-```bash
+Add this line to your application's Gemfile:
+
+```ruby
 gem 'thumbsy'
+```
+
+And then execute:
+
+```sh
 bundle install
 ```
+
+Run the install generator:
+
+```sh
+# Uses default feedback options (like, dislike, funny)
+rails generate thumbsy:install
+
+# Or specify custom feedback options
+rails generate thumbsy:install --feedback=helpful,unhelpful,spam
+```
+
+**Note:**
+- The `--feedback` option is **optional**. If omitted, the default feedback options are `like`, `dislike`, and `funny`.
+- If you pass `--feedback` but do not provide any values (e.g., `--feedback` or `--feedback ""`), the generator will fail with an error.
 
 ## Basic Setup (ActiveRecord only)
 
@@ -44,6 +65,18 @@ The ID type affects:
 - Primary key of the `thumbsy_votes` table
 - Foreign key references to votable and voter models
 
+### Custom Feedback Options
+
+You can customize the feedback options when generating the model:
+
+```bash
+# Use default feedback options (like, dislike, funny)
+rails generate thumbsy:install
+
+# Use custom feedback options
+rails generate thumbsy:install --feedback=helpful,unhelpful,spam
+```
+
 ```ruby
 # Add to your models
 class Book < ApplicationRecord
@@ -56,7 +89,7 @@ end
 
 # Usage
 @book.vote_up(@user)
-@book.vote_down(@user, comment: 'Not helpful')
+@book.vote_down(@user, comment: 'Not helpful', feedback_option: 'unhelpful')
 
 # Querying
 @book.votes_count           # Total votes
@@ -64,6 +97,10 @@ end
 @book.voted_by?(@user)      # Check if user voted
 @book.voters                # All voters
 Book.with_votes             # Books with votes
+
+# Feedback options
+@book.vote_up(@user, feedback_option: 'helpful')
+@book.vote_down(@user, feedback_option: 'spam')
 ```
 
 ## Optional: JSON API Endpoints
@@ -95,7 +132,7 @@ This adds:
 # Vote up on a post
 curl -X POST /api/v1/books/1/vote_up \
   -H "Authorization: Bearer TOKEN" \
-  -d '{"comment": "Great book!"}'
+  -d '{"comment": "Great book!", "feedback_option": "helpful"}'
 
 # Get vote status
 curl -X GET /api/v1/books/1/vote \
@@ -142,6 +179,8 @@ end
 
 ✅ **Comment Support**: Optional comments on every vote
 
+✅ **Feedback Options**: Customizable feedback options (like, dislike, funny, etc.)
+
 ✅ **Rich Queries**: Comprehensive scopes and helper methods
 
 ✅ **Performance Optimized**: Proper database indexes
@@ -152,6 +191,8 @@ end
 
 ✅ **Test Suite**: Complete RSpec tests included
 
+✅ **Template-Based**: Model generated from templates for consistency
+
 ## Use Cases
 
 ### ActiveRecord Only
@@ -159,6 +200,7 @@ end
 - Traditional Rails apps with server-rendered views
 - Internal voting systems
 - Simple like/dislike functionality
+- Content moderation with feedback options
 
 ### With API
 

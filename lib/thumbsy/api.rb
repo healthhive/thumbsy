@@ -30,6 +30,7 @@ module Thumbsy
       require "thumbsy/api/engine"
       require "thumbsy/api/controllers/application_controller"
       require "thumbsy/api/controllers/votes_controller"
+      require "thumbsy/api/serializers/vote_serializer"
     end
 
     # Custom exceptions

@@ -4,12 +4,12 @@
 # Test script to verify Thumbsy gem compatibility across Rails versions
 # Usage: ruby script/test_rails_versions.rb
 
-require 'fileutils'
-require 'English'
+require "fileutils"
+require "English"
 
 class RailsVersionTester
   RAILS_VERSIONS = %w[7.1 7.2 8.0].freeze
-  RUBY_VERSION_REQUIREMENT = '3.2.0'
+  RUBY_VERSION_REQUIREMENT = "3.2.0"
 
   def initialize
     @results = {}
@@ -20,7 +20,7 @@ class RailsVersionTester
   def run_all_tests
     puts "🚀 Testing Thumbsy gem compatibility across Rails versions"
     puts "Ruby version: #{RUBY_VERSION}"
-    puts "Testing Rails versions: #{RAILS_VERSIONS.join(', ')}"
+    puts "Testing Rails versions: #{RAILS_VERSIONS.join(", ")}"
     puts "=" * 60
 
     RAILS_VERSIONS.each do |version|
@@ -37,10 +37,10 @@ class RailsVersionTester
     current_version = Gem::Version.new(RUBY_VERSION)
     required_version = Gem::Version.new(RUBY_VERSION_REQUIREMENT)
 
-    if current_version < required_version
-      puts "❌ Ruby #{RUBY_VERSION_REQUIREMENT}+ required. Current: #{RUBY_VERSION}"
-      exit 1
-    end
+    return unless current_version < required_version
+
+    puts "❌ Ruby #{RUBY_VERSION_REQUIREMENT}+ required. Current: #{RUBY_VERSION}"
+    exit 1
   end
 
   def test_rails_version(version)
@@ -49,7 +49,7 @@ class RailsVersionTester
     start_time = Time.now
 
     # Set environment variable
-    ENV['RAILS_VERSION'] = version
+    ENV["RAILS_VERSION"] = version
 
     # Update bundle
     bundle_result = run_command("bundle update rails", "Bundle update for Rails #{version}")
@@ -67,7 +67,7 @@ class RailsVersionTester
     end
   ensure
     # Clean up environment
-    ENV.delete('RAILS_VERSION')
+    ENV.delete("RAILS_VERSION")
   end
 
   def run_command(command, description)
@@ -80,8 +80,8 @@ class RailsVersionTester
     if success
       puts "  ✅ #{description} - PASSED"
       # Show test summary for test runs
-      if command.include?('rspec')
-        summary_line = output.lines.find { |line| line.include?('examples') && line.include?('failures') }
+      if command.include?("rspec")
+        summary_line = output.lines.find { |line| line.include?("examples") && line.include?("failures") }
         puts "  📊 #{summary_line.strip}" if summary_line
       end
     else
@@ -97,7 +97,7 @@ class RailsVersionTester
     @results[version] = {
       status: :success,
       duration: duration,
-      message: "All tests passed"
+      message: "All tests passed",
     }
     puts "  🎉 Rails #{version} - SUCCESS (#{duration.round(2)}s)"
   end
@@ -105,7 +105,7 @@ class RailsVersionTester
   def record_failure(version, message)
     @results[version] = {
       status: :failure,
-      message: message
+      message: message,
     }
     puts "  💥 Rails #{version} - FAILED: #{message}"
   end
@@ -115,19 +115,26 @@ class RailsVersionTester
     puts "📋 SUMMARY"
     puts "=" * 60
 
-    successes = @results.values.count { |r| r[:status] == :success }
-    failures = @results.values.count { |r| r[:status] == :failure }
+    print_results
+    print_final_status
+  end
 
+  def print_results
     @results.each do |version, result|
       status_icon = result[:status] == :success ? "✅" : "❌"
       duration_info = result[:duration] ? " (#{result[:duration].round(2)}s)" : ""
       puts "#{status_icon} Rails #{version}: #{result[:message]}#{duration_info}"
     end
+  end
+
+  def print_final_status
+    successes = @results.values.count { |r| r[:status] == :success }
+    failures = @results.values.count { |r| r[:status] == :failure }
 
     puts
     puts "🏆 Results: #{successes} passed, #{failures} failed"
 
-    if failures > 0
+    if failures.positive?
       puts "❌ Some tests failed. Check the output above for details."
       exit 1
     else
@@ -140,13 +147,13 @@ end
 if __FILE__ == $PROGRAM_NAME
   # Change to gem root directory
   script_dir = File.dirname(__FILE__)
-  gem_root = File.expand_path('..', script_dir)
+  gem_root = File.expand_path("..", script_dir)
   Dir.chdir(gem_root)
 
   puts "📁 Working directory: #{Dir.pwd}"
 
   # Verify we're in the right place
-  unless File.exist?('thumbsy.gemspec')
+  unless File.exist?("thumbsy.gemspec")
     puts "❌ Error: Not in Thumbsy gem directory (thumbsy.gemspec not found)"
     exit 1
   end
