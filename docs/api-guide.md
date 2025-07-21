@@ -17,7 +17,7 @@ rails generate thumbsy:install # defaults to --id_type=uuid
 rails db:migrate
 ```
 
-Result: ~150 lines of code, ActiveRecord methods only
+Result: ~200 lines of code, ActiveRecord methods only
 
 ### Option 2: Core + API
 
@@ -31,7 +31,7 @@ rails generate thumbsy:api
 rails db:migrate
 ```
 
-Result: ~400 lines of code, ActiveRecord methods + JSON API endpoints
+Result: ~500 lines of code, ActiveRecord methods + JSON API endpoints
 
 ### ID Type Configuration
 
@@ -157,25 +157,53 @@ Thumbsy::Api.configure do |config|
 end
 ```
 
+## API Request Parameters
+
+### Vote Up/Down Parameters
+
+```json
+{
+  "comment": "Great book!",
+  "feedback_option": "like"
+}
+```
+
+**Parameters:**
+- `comment` (optional): Text comment explaining the vote
+- `feedback_option` (optional): One of the configured feedback options (e.g., "like", "dislike", "funny")
+
+### Feedback Options
+
+Feedback options are customizable when generating the model:
+
+```bash
+# Default options (like, dislike, funny)
+rails generate thumbsy:install
+
+# Custom options
+rails generate thumbsy:install --feedback=helpful,unhelpful,spam
+```
+
 ## API Responses
 
 ### Success Response
 
 ```json
 {
-	"success": true,
-	"data": {
-		"id": 123,
-		"vote_type": "up",
-		"comment": "Great book!",
-		"voter": {
-			"id": 456,
-			"name": "John Doe",
-			"avatar": "https://example.com/avatar.jpg"
-		},
-		"created_at": "2024-01-01T12:00:00Z",
-		"updated_at": "2024-01-01T12:00:00Z"
-	}
+  "success": true,
+  "data": {
+    "id": 123,
+    "vote": true,
+    "comment": "Great book!",
+    "feedback_option": "like",
+    "voter": {
+      "id": 456,
+      "name": "John Doe",
+      "avatar": "https://example.com/avatar.jpg"
+    },
+    "created_at": "2024-01-01T12:00:00Z",
+    "updated_at": "2024-01-01T12:00:00Z"
+  }
 }
 ```
 
@@ -183,18 +211,19 @@ end
 
 ```json
 {
-	"success": true,
-	"data": {
-		"voted": true,
-		"vote_type": "up",
-		"comment": "Great book!",
-		"vote_counts": {
-			"total": 5,
-			"up": 4,
-			"down": 1,
-			"score": 3
-		}
-	}
+  "success": true,
+  "data": {
+    "voted": true,
+    "vote_type": "up",
+    "comment": "Great book!",
+    "feedback_option": "like",
+    "vote_counts": {
+      "total": 5,
+      "up": 4,
+      "down": 1,
+      "score": 3
+    }
+  }
 }
 ```
 
@@ -202,422 +231,319 @@ end
 
 ```json
 {
-	"success": false,
-	"error": "Authentication required",
-	"errors": {}
+  "success": false,
+  "error": "Authentication required",
+  "errors": {}
+}
+```
+
+### Validation Error Response
+
+```json
+{
+  "success": false,
+  "error": "Validation failed",
+  "errors": {
+    "feedback_option": ["'invalid_option' is not a valid feedback_option"]
+  }
 }
 ```
 
 ## Frontend Integration
 
-### JavaScript API Client
+### JavaScript/TypeScript
 
 ```javascript
-class VotingAPI {
-	constructor(baseURL, token) {
-		this.baseURL = baseURL;
-		this.token = token;
-	}
+// Vote up with comment and feedback
+const voteUp = async (votableType, votableId, comment, feedbackOption) => {
+  const response = await fetch(`/api/v1/${votableType}/${votableId}/vote_up`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      comment: comment,
+      feedback_option: feedbackOption
+    })
+  });
 
-	async voteUp(type, id, comment = null) {
-		return this.request("POST", `${type}/${id}/vote_up`, { comment });
-	}
-
-	async voteDown(type, id, comment = null) {
-		return this.request("POST", `${type}/${id}/vote_down`, { comment });
-	}
-
-	async removeVote(type, id) {
-		return this.request("DELETE", `${type}/${id}/vote`);
-	}
-
-	async getVoteStatus(type, id) {
-		return this.request("GET", `${type}/${id}/vote`);
-	}
-
-	async getAllVotes(type, id) {
-		return this.request("GET", `${type}/${id}/votes`);
-	}
-
-	async request(method, path, data = null) {
-		const options = {
-			method,
-			headers: {
-				Authorization: `Bearer ${this.token}`,
-				"Content-Type": "application/json",
-			},
-		};
-
-		if (data && method !== "GET") {
-			options.body = JSON.stringify(data);
-		}
-
-		const response = await fetch(`${this.baseURL}/${path}`, options);
-		return response.json();
-	}
-}
-
-// Usage
-const voting = new VotingAPI("/api/v1", "your-token-here");
-
-// Vote up on a book
-voting
-	.voteUp("books", 123, "Great book!")
-	.then((result) => console.log(result));
+  const data = await response.json();
+  return data;
+};
 
 // Get vote status
-voting.getVoteStatus("books", 123).then((status) => {
-	console.log(`Voted: ${status.data.voted}`);
-	console.log(`Score: ${status.data.vote_counts.score}`);
-});
+const getVoteStatus = async (votableType, votableId) => {
+  const response = await fetch(`/api/v1/${votableType}/${votableId}/vote`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+  return data;
+};
 ```
 
-### React Component Example
+### React Hook Example
 
-```jsx
-import { useState, useEffect } from "react";
+```javascript
+import { useState, useEffect } from 'react';
 
-function VotingButtons({ postType, postId, authToken }) {
-	const [voteStatus, setVoteStatus] = useState(null);
-	const [loading, setLoading] = useState(false);
+const useVote = (votableType, votableId) => {
+  const [voteStatus, setVoteStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-	const voting = new VotingAPI("/api/v1", authToken);
+  const fetchVoteStatus = async () => {
+    try {
+      const data = await getVoteStatus(votableType, votableId);
+      setVoteStatus(data.data);
+    } catch (error) {
+      console.error('Failed to fetch vote status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	useEffect(() => {
-		loadVoteStatus();
-	}, [postId]);
+  const voteUp = async (comment, feedbackOption) => {
+    try {
+      const data = await voteUp(votableType, votableId, comment, feedbackOption);
+      await fetchVoteStatus(); // Refresh status
+      return data;
+    } catch (error) {
+      console.error('Failed to vote up:', error);
+      throw error;
+    }
+  };
 
-	const loadVoteStatus = async () => {
-		try {
-			const result = await voting.getVoteStatus(postType, postId);
-			setVoteStatus(result.data);
-		} catch (error) {
-			console.error("Failed to load vote status:", error);
-		}
-	};
+  const voteDown = async (comment, feedbackOption) => {
+    try {
+      const data = await voteDown(votableType, votableId, comment, feedbackOption);
+      await fetchVoteStatus(); // Refresh status
+      return data;
+    } catch (error) {
+      console.error('Failed to vote down:', error);
+      throw error;
+    }
+  };
 
-	const handleVote = async (direction, comment = null) => {
-		setLoading(true);
+  const removeVote = async () => {
+    try {
+      await removeVote(votableType, votableId);
+      await fetchVoteStatus(); // Refresh status
+    } catch (error) {
+      console.error('Failed to remove vote:', error);
+      throw error;
+    }
+  };
 
-		try {
-			if (direction === "up") {
-				await voting.voteUp(postType, postId, comment);
-			} else {
-				await voting.voteDown(postType, postId, comment);
-			}
+  useEffect(() => {
+    fetchVoteStatus();
+  }, [votableType, votableId]);
 
-			await loadVoteStatus();
-		} catch (error) {
-			console.error("Vote failed:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
+  return {
+    voteStatus,
+    loading,
+    voteUp,
+    voteDown,
+    removeVote
+  };
+};
+```
 
-	const handleRemoveVote = async () => {
-		setLoading(true);
+### Vue.js Example
 
-		try {
-			await voting.removeVote(postType, postId);
-			await loadVoteStatus();
-		} catch (error) {
-			console.error("Remove vote failed:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
+```javascript
+// composables/useVote.js
+import { ref, onMounted } from 'vue';
 
-	if (!voteStatus) return <div>Loading...</div>;
+export function useVote(votableType, votableId) {
+  const voteStatus = ref(null);
+  const loading = ref(true);
 
-	const { voted, vote_type, vote_counts } = voteStatus;
+  const fetchVoteStatus = async () => {
+    try {
+      const data = await getVoteStatus(votableType, votableId);
+      voteStatus.value = data.data;
+    } catch (error) {
+      console.error('Failed to fetch vote status:', error);
+    } finally {
+      loading.value = false;
+    }
+  };
 
-	return (
-		<div className="voting-buttons">
-			<button
-				onClick={() => handleVote("up")}
-				disabled={loading}
-				className={vote_type === "up" ? "active" : ""}
-			>
-				👍 {vote_counts.up}
-			</button>
+  const voteUp = async (comment, feedbackOption) => {
+    try {
+      const data = await voteUp(votableType, votableId, comment, feedbackOption);
+      await fetchVoteStatus();
+      return data;
+    } catch (error) {
+      console.error('Failed to vote up:', error);
+      throw error;
+    }
+  };
 
-			<button
-				onClick={() => handleVote("down")}
-				disabled={loading}
-				className={vote_type === "down" ? "active" : ""}
-			>
-				👎 {vote_counts.down}
-			</button>
+  onMounted(() => {
+    fetchVoteStatus();
+  });
 
-			{voted && (
-				<button
-					onClick={handleRemoveVote}
-					disabled={loading}
-					className="remove-vote"
-				>
-					Remove Vote
-				</button>
-			)}
-
-			<span className="score">Score: {vote_counts.score}</span>
-
-			<span className="total">Total: {vote_counts.total}</span>
-		</div>
-	);
+  return {
+    voteStatus,
+    loading,
+    voteUp,
+    voteDown,
+    removeVote
+  };
 }
-
-export default VotingButtons;
-```
-
-### Mobile App Integration (Swift/iOS)
-
-```swift
-import Foundation
-
-class VotingService {
-    private let baseURL: String
-    private let authToken: String
-
-    init(baseURL: String, authToken: String) {
-        self.baseURL = baseURL
-        self.authToken = authToken
-    }
-
-    func voteUp(on resourceType: String, id: Int, comment: String? = nil) async throws -> VoteResponse {
-        let url = URL(string: "\(baseURL)/\(resourceType)/\(id)/vote_up")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        if let comment = comment {
-            let body = ["comment": comment]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        }
-
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(VoteResponse.self, from: data)
-    }
-
-    func getVoteStatus(for resourceType: String, id: Int) async throws -> VoteStatusResponse {
-        let url = URL(string: "\(baseURL)/\(resourceType)/\(id)/vote")!
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
-
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(VoteStatusResponse.self, from: data)
-    }
-}
-
-// Usage
-let voting = VotingService(baseURL: "https://api.yourapp.com/v1", authToken: userToken)
-
-Task {
-    do {
-        let result = try await voting.voteUp(on: "books", id: 123, comment: "Great book!")
-        print("Vote successful: \(result)")
-    } catch {
-        print("Vote failed: \(error)")
-    }
-}
-```
-
-## Route Mounting
-
-### Under API namespace
-
-```ruby
-# config/routes.rb
-Rails.application.routes.draw do
-  namespace :api do
-    namespace :v1 do
-      mount Thumbsy::Api::Engine => "/", as: :voting
-    end
-  end
-end
-
-# Results in routes like: /api/v1/books/1/vote_up
-```
-
-### Custom path
-
-```ruby
-# config/routes.rb
-Rails.application.routes.draw do
-  mount Thumbsy::Api::Engine => "/voting-api"
-end
-
-# Results in routes like: /voting-api/books/1/vote_up
-```
-
-## Custom Authorization Examples
-
-### Content-based Authorization
-
-```ruby
-Thumbsy::Api.configure do |config|
-  config.require_authorization = true
-  config.authorization_method = proc do |votable, voter|
-    case votable.class.name
-    when "Book"
-      votable.published? && !votable.archived? && !voter.banned?
-    when "Comment"
-      votable.book.published? && voter.can_vote?
-    else
-      true
-    end
-  end
-end
-```
-
-### Role-based Authorization
-
-```ruby
-Thumbsy::Api.configure do |config|
-  config.authorization_method = proc do |votable, voter|
-    voter.has_role?(:voter) || voter.admin?
-  end
-end
 ```
 
 ## Error Handling
 
-The API handles common errors gracefully:
+### Common Error Scenarios
 
-- `404 Not Found` - Votable resource not found
-- `401 Unauthorized` - Authentication required or failed
-- `403 Forbidden` - Authorization failed
-- `422 Unprocessable Entity` - Validation errors (duplicate vote, etc.)
-- `400 Bad Request` - Invalid parameters
+1. **Authentication Required**
+   ```json
+   {
+     "success": false,
+     "error": "Authentication required"
+   }
+   ```
 
-## Testing the API
+2. **Invalid Feedback Option**
+   ```json
+   {
+     "success": false,
+     "error": "Validation failed",
+     "errors": {
+       "feedback_option": ["'invalid_option' is not a valid feedback_option"]
+     }
+   }
+   ```
 
-### Using cURL
+3. **Resource Not Found**
+   ```json
+   {
+     "success": false,
+     "error": "Resource not found"
+   }
+   ```
 
-```bash
-# Vote up
-curl -X POST http://localhost:3000/api/v1/books/1/vote_up \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"comment": "Great book!"}'
+4. **Authorization Failed**
+   ```json
+   {
+     "success": false,
+     "error": "Access denied"
+   }
+   ```
 
-# Vote down
-curl -X POST http://localhost:3000/api/v1/books/1/vote_down \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"comment": "Not helpful"}'
+### Error Handling in Frontend
 
-# Get vote status
-curl -X GET http://localhost:3000/api/v1/books/1/vote \
-  -H "Authorization: Bearer YOUR_TOKEN"
+```javascript
+const handleVote = async (action, comment, feedbackOption) => {
+  try {
+    setLoading(true);
 
-# Remove vote
-curl -X DELETE http://localhost:3000/api/v1/books/1/vote \
-  -H "Authorization: Bearer YOUR_TOKEN"
+    let response;
+    if (action === 'up') {
+      response = await voteUp(comment, feedbackOption);
+    } else if (action === 'down') {
+      response = await voteDown(comment, feedbackOption);
+    } else if (action === 'remove') {
+      response = await removeVote();
+    }
 
-# Get all votes
-curl -X GET http://localhost:3000/api/v1/books/1/votes \
-  -H "Authorization: Bearer YOUR_TOKEN"
+    if (response.success) {
+      // Handle success
+      showSuccessMessage('Vote recorded successfully');
+    } else {
+      // Handle API error
+      showErrorMessage(response.error);
+    }
+  } catch (error) {
+    // Handle network/other errors
+    if (error.response?.status === 401) {
+      showErrorMessage('Please log in to vote');
+    } else if (error.response?.status === 422) {
+      const data = await error.response.json();
+      showErrorMessage(data.errors?.feedback_option?.[0] || 'Invalid vote data');
+    } else {
+      showErrorMessage('Failed to record vote. Please try again.');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 ```
 
-### RSpec Testing
+## Performance Considerations
+
+### Caching Strategies
+
+1. **Vote Counts**: Cache vote counts for frequently accessed items
+2. **User Vote Status**: Cache individual user vote status
+3. **API Responses**: Use HTTP caching headers for vote status endpoints
+
+### Database Optimization
+
+- Proper indexes on polymorphic associations
+- Efficient queries for vote counting
+- Background processing for vote analytics
+
+## Security Considerations
+
+### Input Validation
+
+- Validate feedback options against allowed values
+- Sanitize comment text
+- Rate limiting for vote submissions
+
+### Authorization
+
+- Ensure users can only vote on accessible content
+- Prevent vote manipulation through proper authentication
+- Audit logging for vote changes
+
+## Testing
+
+### API Testing
 
 ```ruby
-# spec/requests/voting_api_spec.rb
-require "rails_helper"
-
-RSpec.describe "Voting API", type: :request do
+# spec/api_integration_spec.rb
+RSpec.describe "Thumbsy API" do
   let(:user) { User.create!(name: "Test User") }
   let(:book) { Book.create!(title: "Test Book") }
-  let(:headers) { { "Authorization" => "Bearer #{user.token}" } }
+
+  before do
+    Thumbsy::Api.configure do |config|
+      config.require_authentication = false
+      config.current_voter_method = -> { user }
+    end
+  end
 
   describe "POST /books/:id/vote_up" do
-    it "creates an up vote" do
-      post "/api/v1/books/#{book.id}/vote_up",
-           params: { comment: "Great!" }.to_json,
-           headers: headers.merge("Content-Type" => "application/json")
+    it "creates a vote with feedback option" do
+      post "/books/#{book.id}/vote_up", params: {
+        comment: "Great book!",
+        feedback_option: "like"
+      }
 
       expect(response).to have_http_status(:created)
-
       json = JSON.parse(response.body)
-      expect(json["success"]).to be true
-      expect(json["data"]["vote_type"]).to eq("up")
-      expect(json["data"]["comment"]).to eq("Great!")
+      expect(json["data"]["feedback_option"]).to eq("like")
+      expect(json["data"]["comment"]).to eq("Great book!")
     end
-  end
 
-  describe "GET /books/:id/vote" do
-    it "returns vote status" do
-      book.vote_up(user, comment: "Nice!")
+    it "rejects invalid feedback options" do
+      post "/books/#{book.id}/vote_up", params: {
+        feedback_option: "invalid"
+      }
 
-      get "/api/v1/books/#{book.id}/vote", headers: headers
-
+      expect(response).to have_http_status(:unprocessable_entity)
       json = JSON.parse(response.body)
-      expect(json["data"]["voted"]).to be true
-      expect(json["data"]["vote_type"]).to eq("up")
-      expect(json["data"]["vote_counts"]["total"]).to eq(1)
-    end
-  end
-
-  describe "DELETE /books/:id/vote" do
-    it "removes existing vote" do
-      book.vote_up(user)
-
-      delete "/api/v1/books/#{book.id}/vote", headers: headers
-
-      expect(response).to have_http_status(:ok)
-      json = JSON.parse(response.body)
-      expect(json["success"]).to be true
+      expect(json["errors"]["feedback_option"]).to include("'invalid' is not a valid feedback_option")
     end
   end
 end
-
-# Use included test helpers
-include Thumbsy::ApiTestHelpers
-
-# Test voting with helpers
-response = vote_up(book, user, comment: "Great!")
-expect(response["success"]).to be true
-
-response = vote_down(book, user)
-expect(response["data"]["vote_type"]).to eq("down")
 ```
 
-## Migration from Core to API
-
-If you start with just the core ActiveRecord functionality and later need API endpoints:
-
-```bash
-# Already have Thumbsy core installed
-rails generate thumbsy:api
-```
-
-This adds the API functionality without breaking any existing code. Your ActiveRecord methods continue to work exactly as before, and you gain the JSON API endpoints.
-
-## Benefits of Optional API Design
-
-### 1. Start Simple
-
-- Begin with ActiveRecord methods for traditional Rails views
-- Add API endpoints only when needed (mobile app, SPA, etc.)
-- No upfront complexity for simple use cases
-
-### 2. Zero Breaking Changes
-
-- Adding API functionality doesn't affect existing ActiveRecord usage
-- Existing controllers and views continue working unchanged
-- Gradual migration path available
-
-### 3. Performance
-
-- Core-only installation: ~150 lines of code
-- Minimal memory footprint without API components
-- API components loaded only when explicitly required
-
-### 4. Flexibility
-
-- Use traditional Rails patterns or modern API patterns
-- Support multiple frontend types simultaneously
-- Easy to extract voting to microservice later
-
-The optional API design ensures Thumbsy grows with your application's needs while maintaining simplicity for basic use cases.
+This API guide provides comprehensive documentation for integrating Thumbsy's API endpoints into your applications, with support for the new feedback options feature.

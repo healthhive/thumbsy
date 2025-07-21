@@ -2,7 +2,6 @@
 
 require "spec_helper"
 
-# Test models for comprehensive testing
 class User < ActiveRecord::Base
   voter
 end
@@ -10,6 +9,8 @@ end
 class Book < ActiveRecord::Base
   votable
 end
+
+# Test models for comprehensive testing
 
 RSpec.describe "Thumbsy Comprehensive Functionality" do
   let(:user) { User.create!(name: "Test User") }
@@ -53,14 +54,13 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
 
     it "supports load_api! method" do
       # This may raise an error in non-Rails environments, which is expected
-      begin
-        Thumbsy.load_api!
-        # If it succeeds, Api should be available
-        expect(defined?(Thumbsy::Api)).to be_truthy
-      rescue NameError => e
-        # Expected in non-Rails environments when ActionController::API is not available
-        expect(e.message).to include("ActionController::API")
-      end
+
+      Thumbsy.load_api!
+      # If it succeeds, Api should be available
+      expect(defined?(Thumbsy::Api)).to be_truthy
+    rescue NameError => e
+      # Expected in non-Rails environments when ActionController::API is not available
+      expect(e.message).to include("ActionController::API")
     end
 
     it "handles const_missing for unknown constants" do
@@ -432,12 +432,8 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
     it "handles voter without thumbsy_votes capability" do
       # Create an object that doesn't have voter functionality
       invalid_voter = Object.new
-
-      result = book.vote_up(invalid_voter)
-      expect(result).to be false
-
-      result = book.vote_down(invalid_voter)
-      expect(result).to be false
+      expect(book.vote_up(invalid_voter)).to be false
+      expect(book.vote_down(invalid_voter)).to be false
     end
 
     it "handles votable without thumbsy_votes capability from voter perspective" do
@@ -515,32 +511,19 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
     end
 
     it "handles remove_vote return values correctly" do
-      # Test when vote exists
       book.vote_up(user)
       result = book.remove_vote(user)
-      # remove_vote uses destroy_all which returns an array, truthy but not boolean true
-      expect(result).to be_truthy
-
-      # Test when no vote exists
-      result = book.remove_vote(user2)
-      # destroy_all returns empty array when nothing to destroy, still truthy
-      expect(result).to be_truthy
+      expect(result).to be true
+      result = book.remove_vote(user)
+      expect(result).to be false
     end
 
     it "handles destroy_all return values in remove_vote" do
-      # Test the actual return value semantics of remove_vote
       book.vote_up(user)
-
-      # remove_vote calls destroy_all, which returns the destroyed records
       destroyed_votes = book.remove_vote(user)
-      expect(destroyed_votes).to be_an(Array)
-      expect(destroyed_votes).not_to be_empty
-
-      # Calling again should return empty array but still truthy
+      expect(destroyed_votes).to be true
       destroyed_votes_again = book.remove_vote(user)
-      expect(destroyed_votes_again).to be_an(Array)
-      expect(destroyed_votes_again).to be_empty
-      expect(destroyed_votes_again).to be_truthy # Empty array is truthy in Ruby
+      expect(destroyed_votes_again).to be false
     end
 
     it "verifies association dependent destroy behavior" do
@@ -651,12 +634,32 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
         duplicate_vote = ThumbsyVote.new(
           votable: book,
           voter: user,
-          vote: false
+          vote: false,
         )
 
         expect(duplicate_vote.valid?).to be false
         expect(duplicate_vote.errors[:voter_id]).to include("has already been taken")
       end
+    end
+  end
+
+  describe "Feedback Option Validation" do
+    let(:vote) { ThumbsyVote.new(votable: book, voter: user, vote: true) }
+
+    it "accepts valid feedback_option values" do
+      ThumbsyVote::FEEDBACK_OPTIONS.each do |option|
+        vote.feedback_option = option
+        expect(vote).to be_valid, "expected '#{option}' to be valid"
+      end
+    end
+
+    it "allows feedback_option to be nil" do
+      vote.feedback_option = nil
+      expect(vote).to be_valid
+    end
+
+    it "rejects invalid feedback_option values" do
+      expect { vote.feedback_option = "invalid_option" }.to raise_error(ArgumentError)
     end
   end
 

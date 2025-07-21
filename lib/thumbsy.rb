@@ -6,7 +6,6 @@ require "thumbsy/engine"
 require "thumbsy/votable"
 require "thumbsy/voter"
 
-
 module Thumbsy
   # Basic configuration
   mattr_accessor :vote_model_name
@@ -34,6 +33,4 @@ module Thumbsy
 end
 
 # Extend ActiveRecord when available (fallback if Rails engine doesn't load)
-if defined?(ActiveRecord::Base) && !defined?(Thumbsy::Engine)
-  ActiveRecord::Base.extend(Thumbsy::Extension)
-end
+ActiveRecord::Base.extend(Thumbsy::Extension) if defined?(ActiveRecord::Base) && !defined?(Thumbsy::Engine)

@@ -3,21 +3,21 @@
 require "spec_helper"
 require "benchmark"
 
+class User < ActiveRecord::Base
+  voter
+end
+
+class Book < ActiveRecord::Base
+  votable
+end
+
 RSpec.describe "Thumbsy Performance", :performance do
   USER_COUNT = 10
   BOOK_COUNT = 5
   VOTE_COUNT = 25
 
   before(:all) do
-    # Define test models
-    class User < ActiveRecord::Base
-      voter
-    end
-
-    class Book < ActiveRecord::Base
-      votable
-    end
-
+    # Restore test model definitions:
     # Create test data
     @users = USER_COUNT.times.map { |i| User.create!(name: "User #{i}") }
     @books = BOOK_COUNT.times.map { |i| Book.create!(title: "Book #{i}") }

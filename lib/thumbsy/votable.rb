@@ -12,29 +12,28 @@ module Thumbsy
       scope :with_comments, -> { joins(:thumbsy_votes).where.not(thumbsy_votes: { comment: [nil, ""] }) }
     end
 
-    def vote_up(voter, comment: nil)
-      vote_for(voter, true, comment: comment)
+    def vote_up(voter, comment: nil, feedback_option: nil)
+      return false if voter && !voter.respond_to?(:thumbsy_votes)
+
+      ThumbsyVote.vote_for(self, voter, true, comment: comment, feedback_option: feedback_option)
+    rescue ActiveRecord::RecordInvalid
+      false
     end
 
-    def vote_down(voter, comment: nil)
-      vote_for(voter, false, comment: comment)
+    def vote_down(voter, comment: nil, feedback_option: nil)
+      return false if voter && !voter.respond_to?(:thumbsy_votes)
+
+      ThumbsyVote.vote_for(self, voter, false, comment: comment, feedback_option: feedback_option)
+    rescue ActiveRecord::RecordInvalid
+      false
     end
 
-    def vote_for(voter, vote_value, comment: nil)
-      return false unless voter.respond_to?(:thumbsy_votes)
-
-      existing_vote = thumbsy_votes.find_by(voter: voter)
-      if existing_vote
-        existing_vote.update(vote: vote_value, comment: comment)
-        existing_vote
-      else
-        thumbsy_votes.create(voter: voter, vote: vote_value, comment: comment)
-      end
-    end
-
+    # rubocop:disable Naming/PredicateMethod
     def remove_vote(voter)
-      thumbsy_votes.where(voter: voter).destroy_all
+      destroyed = thumbsy_votes.where(voter: voter).destroy_all
+      destroyed.any?
     end
+    # rubocop:enable Naming/PredicateMethod
 
     def voted_by?(voter)
       thumbsy_votes.exists?(voter: voter)
