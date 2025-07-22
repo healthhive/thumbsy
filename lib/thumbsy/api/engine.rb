@@ -5,10 +5,6 @@ module Thumbsy
     class Engine < ::Rails::Engine
       isolate_namespace Thumbsy::Api
 
-      config.generators do |g|
-        g.test_framework :rspec
-      end
-
       # Load API routes
       config.after_initialize do
         Thumbsy::Api::Engine.routes.draw do

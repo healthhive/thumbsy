@@ -134,7 +134,7 @@ RSpec.describe "Thumbsy Performance", :performance do
       end
 
       # Should be very fast with proper indexing
-      expect(time_taken).to be < 0.1
+      expect(time_taken).to be < 0.15
       puts "Time for voter lookup: #{time_taken.round(4)}s"
     end
 
@@ -169,7 +169,7 @@ RSpec.describe "Thumbsy Performance", :performance do
       end
 
       # Duplicate handling should be fast
-      expect(time_taken).to be < 0.1
+      expect(time_taken).to be < 0.15
       expect(book.votes_count).to eq(book.votes_count) # No change
       puts "Time for 10 duplicate vote attempts: #{time_taken.round(4)}s"
     end

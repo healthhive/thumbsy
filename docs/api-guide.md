@@ -69,53 +69,58 @@ GET /books/1/votes
 
 ## API Configuration
 
-Configure the API in `config/initializers/thumbsy_api.rb`:
+Configure the API and feedback options in `config/initializers/thumbsy.rb` (centralized initializer):
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  # Authentication (required by default)
-  config.require_authentication = true
+Thumbsy.configure do |config|
+  config.feedback_options = %w[like dislike funny]
 
-  # Custom authentication method
-  config.authentication_method = proc do
-    authenticate_user! # Your auth method
-  end
-
-  # Set current voter
-  config.current_voter_method = proc do
-    current_user # Your current user method
-  end
-
-  # Authorization (optional)
-  config.require_authorization = false
-  config.authorization_method = proc do |votable, voter|
-    # Return true/false for access
-    votable.published? && !voter.banned?
-  end
-
-  # Custom voter serialization
-  config.voter_serializer = proc do |voter|
-    {
-      id: voter.id,
-      name: voter.name,
-      avatar: voter.avatar.attached? ? rails_blob_url(voter.avatar) : nil
-    }
+  config.api do |api|
+    api.require_authentication = true
+    api.authentication_method = proc do
+      # ...
+    end
+    api.current_voter_method = proc do
+      # ...
+    end
   end
 end
 ```
 
+If you use the `--feedback` option with the installer, e.g.:
+
+```sh
+rails generate thumbsy:install --feedback=helpful,unhelpful,spam
+```
+
+The installer will generate an initializer with:
+
+```ruby
+Thumbsy.configure do |config|
+  config.feedback_options = %w[helpful unhelpful spam]
+end
+```
+
+**Note:**
+- The API generator (`rails generate thumbsy:api`) will add `require 'thumbsy/api'` and `Thumbsy::Api.load!` to the top of `config/initializers/thumbsy.rb` if not already present, instead of creating a separate initializer.
+- The `ThumbsyVote` model is provided by the gem and always uses the current value of `Thumbsy.feedback_options` for its enum and validation.
+
 ## Authentication Integration
+
+All authentication options are set inside the `config.api` block in your `thumbsy.rb` initializer. Here are common patterns:
 
 ### Devise Authentication
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  config.authentication_method = proc do
-    authenticate_user!
-  end
-
-  config.current_voter_method = proc do
-    current_user
+Thumbsy.configure do |config|
+  # ...
+  config.api do |api|
+    api.authentication_method = proc do
+      authenticate_user!
+    end
+    api.current_voter_method = proc do
+      current_user
+    end
   end
 end
 ```
@@ -123,20 +128,21 @@ end
 ### JWT Authentication
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  config.authentication_method = proc do
-    token = request.headers["Authorization"]&.split(" ")&.last
-
-    begin
-      decoded_token = JWT.decode(token, Rails.application.secret_key_base).first
-      @current_user = User.find(decoded_token["user_id"])
-    rescue JWT::DecodeError, ActiveRecord::RecordNotFound
-      head :unauthorized
+Thumbsy.configure do |config|
+  # ...
+  config.api do |api|
+    api.authentication_method = proc do
+      token = request.headers["Authorization"]&.split(" ")&.last
+      begin
+        decoded_token = JWT.decode(token, Rails.application.secret_key_base).first
+        @current_user = User.find(decoded_token["user_id"])
+      rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+        head :unauthorized
+      end
     end
-  end
-
-  config.current_voter_method = proc do
-    @current_user
+    api.current_voter_method = proc do
+      @current_user
+    end
   end
 end
 ```
@@ -144,15 +150,17 @@ end
 ### API Key Authentication
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  config.authentication_method = proc do
-    api_key = request.headers["X-API-Key"]
-    @current_user = User.find_by(api_key: api_key)
-    head :unauthorized unless @current_user&.active?
-  end
-
-  config.current_voter_method = proc do
-    @current_user
+Thumbsy.configure do |config|
+  # ...
+  config.api do |api|
+    api.authentication_method = proc do
+      api_key = request.headers["X-API-Key"]
+      @current_user = User.find_by(api_key: api_key)
+      head :unauthorized unless @current_user&.active?
+    end
+    api.current_voter_method = proc do
+      @current_user
+    end
   end
 end
 ```
@@ -172,17 +180,11 @@ end
 - `comment` (optional): Text comment explaining the vote
 - `feedback_option` (optional): One of the configured feedback options (e.g., "like", "dislike", "funny")
 
-### Feedback Options
+## Feedback Options
 
-Feedback options are customizable when generating the model:
-
-```bash
-# Default options (like, dislike, funny)
-rails generate thumbsy:install
-
-# Custom options
-rails generate thumbsy:install --feedback=helpful,unhelpful,spam
-```
+- `feedback_option` is always a string key (e.g., "like", "dislike").
+- The API and serializer will always return the string value for feedback_option.
+- Invalid feedback options will result in a validation error.
 
 ## API Responses
 
@@ -248,6 +250,12 @@ rails generate thumbsy:install --feedback=helpful,unhelpful,spam
   }
 }
 ```
+
+## API Generator
+
+- The API generator (`rails generate thumbsy:api`) will **not** create a separate initializer.
+- It will add `require 'thumbsy/api'` and `Thumbsy::Api.load!` to the top of `config/initializers/thumbsy.rb` if not already present.
+- All API and feedback configuration is centralized in `thumbsy.rb`.
 
 ## Frontend Integration
 

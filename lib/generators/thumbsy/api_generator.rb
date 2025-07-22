@@ -9,7 +9,24 @@ module Thumbsy
       desc "Generate Thumbsy API configuration and routes"
 
       def create_api_initializer
-        copy_file "thumbsy_api.rb", "config/initializers/thumbsy_api.rb"
+        initializer_path = "config/initializers/thumbsy.rb"
+        require_line = "require 'thumbsy/api'"
+        load_line = "Thumbsy::Api.load!"
+        insert_lines = "# Load Thumbsy API if you want to use the API endpoints\n#{require_line}\n#{load_line}\n\n"
+
+        if File.exist?(initializer_path)
+          content = File.read(initializer_path)
+          if content.include?(require_line) && content.include?(load_line)
+            say "API require and load lines already present in #{initializer_path}"
+          else
+            new_content = insert_lines + content
+            File.write(initializer_path, new_content)
+            say "Added API require and load lines to #{initializer_path}"
+          end
+        else
+          create_file initializer_path, insert_lines
+          say "Created #{initializer_path} with API require and load lines"
+        end
       end
 
       def add_api_require

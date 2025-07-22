@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "../../lib/thumbsy/api"
-require_relative "../../lib/thumbsy/api/serializers/vote_serializer"
+
+require "thumbsy/api"
+require "thumbsy/api/serializers/vote_serializer"
 
 # Test models for serializer spec
 class SerializerTestUser < ActiveRecord::Base
@@ -16,15 +17,27 @@ class SerializerTestBook < ActiveRecord::Base
 end
 
 RSpec.describe Thumbsy::Api::Serializers::VoteSerializer do
+  before(:all) do
+    Thumbsy.feedback_options = %w[like dislike funny]
+    Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+    load "lib/thumbsy/models/thumbsy_vote.rb"
+  end
+
+  before(:each) do
+    Thumbsy::Api.configure do |config|
+      config.require_authentication = false
+      config.require_authorization = false
+      config.authentication_method = nil
+      config.current_voter_method = -> { SerializerTestUser.first }
+      config.authorization_method = nil
+      config.voter_serializer = nil
+    end
+  end
+
   let!(:user) { SerializerTestUser.create!(name: "Serializer User") }
   let!(:book) { SerializerTestBook.create!(title: "Serializer Book") }
   let(:vote) { book.vote_up(user, comment: "Test vote", feedback_option: "like") }
   let(:serializer) { described_class.new(vote) }
-
-  before do
-    # Reset to default configuration
-    Thumbsy::Api.voter_serializer = nil
-  end
 
   describe "#as_json" do
     it "returns vote data without timestamps" do
@@ -67,7 +80,6 @@ RSpec.describe Thumbsy::Api::Serializers::VoteSerializer do
     it "handles down votes correctly" do
       down_vote = book.vote_down(user, comment: "Down vote", feedback_option: "dislike")
       serializer = described_class.new(down_vote)
-
       result = serializer.as_json
 
       expect(result).to include(

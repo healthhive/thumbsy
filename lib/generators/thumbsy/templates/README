@@ -1,6 +1,6 @@
 ===============================================================================
 
-Thumbsy has been installed! 
+Thumbsy has been installed!
 
 Next steps:
 
@@ -24,7 +24,7 @@ Next steps:
    # Voting
    @post.vote_up(@user)
    @post.vote_down(@user, comment: "Not helpful")
-   
+
    # Or from voter perspective:
    @user.vote_up_for(@post)
    @user.vote_down_for(@post, comment: "Great post!")
@@ -51,6 +51,6 @@ Next steps:
    @post.votes_with_comments
    @post.up_votes_with_comments
 
-For more information, visit: https://github.com/yourusername/thumbsy
+For more information, visit: https://github.com/healthhive/thumbsy
 
 ===============================================================================

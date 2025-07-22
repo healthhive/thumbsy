@@ -7,8 +7,8 @@ module Thumbsy
   module Generators
     class InstallGenerator < Rails::Generators::Base
       include Rails::Generators::Migration
-      source_root File.expand_path("templates", __dir__)
-      desc "Installs Thumbsy and generates the ThumbsyVote model."
+      source_root File.expand_path("../../../lib/generators/thumbsy/templates", __dir__)
+      desc "Installs Thumbsy and sets up ThumbsyVote support."
 
       class_option :feedback, type: :array, desc: "Feedback options for votes (e.g. --feedback like dislike funny)"
 
@@ -26,12 +26,20 @@ module Thumbsy
           say "\nERROR: --feedback option must have at least one value if provided (e.g. --feedback=like,dislike)", :red
           exit(1)
         end
+        @feedback_options = options[:feedback]
         migration_template "create_thumbsy_votes.rb", "db/migrate/create_thumbsy_votes.rb"
       end
 
-      def create_thumbsy_vote_model
-        feedback_options = options[:feedback] || %w[like dislike funny]
-        template "thumbsy_vote.rb.tt", "app/models/thumbsy_vote.rb", feedback_options: feedback_options
+      def create_initializer_file
+        return unless options[:feedback].present?
+
+        feedback_options = if options[:feedback].is_a?(Array)
+                             options[:feedback]
+                           else
+                             options[:feedback].to_s.split(",")
+                           end
+        feedback_options.map!(&:strip)
+        template "thumbsy.rb", "config/initializers/thumbsy.rb"
       end
 
       def show_readme

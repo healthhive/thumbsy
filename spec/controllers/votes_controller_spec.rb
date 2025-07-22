@@ -3,10 +3,10 @@
 require "spec_helper"
 require "action_controller"
 require "action_controller/api"
-require_relative "../../lib/thumbsy/api"
-require_relative "../../lib/thumbsy/api/controllers/application_controller"
-require_relative "../../lib/thumbsy/api/controllers/votes_controller"
-require_relative "../../lib/thumbsy/api/serializers/vote_serializer"
+require "thumbsy/api"
+require "thumbsy/api/controllers/application_controller"
+require "thumbsy/api/controllers/votes_controller"
+require "thumbsy/api/serializers/vote_serializer"
 
 class User < ActiveRecord::Base
   voter
@@ -28,6 +28,11 @@ RSpec.describe Thumbsy::Api::VotesController do
   let(:controller) { described_class.new }
 
   before(:each) do
+    # Setup feedback options and reload model
+    Thumbsy.feedback_options = %w[like dislike funny]
+    Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+    load "lib/thumbsy/models/thumbsy_vote.rb"
+
     # Reset configuration before each test
     Thumbsy::Api.configure do |config|
       config.require_authentication = false
@@ -252,6 +257,11 @@ RSpec.describe Thumbsy::Api::VotesController do
 
   describe "Integration Flow Tests" do
     before do
+      # Ensure model is loaded with correct feedback options
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       allow(controller).to receive(:find_votable)
       controller.instance_variable_set(:@votable, book)
     end
@@ -499,6 +509,11 @@ RSpec.describe Thumbsy::Api::VotesController do
 
   describe "Serializer Integration" do
     before do
+      # Ensure model is loaded with correct feedback options
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       allow(controller).to receive(:find_votable)
       controller.instance_variable_set(:@votable, book)
     end

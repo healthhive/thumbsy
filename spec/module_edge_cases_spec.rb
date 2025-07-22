@@ -184,7 +184,7 @@ RSpec.describe "Thumbsy Module Edge Cases" do
 
       it "returns vote object for existing vote" do
         vote = book.vote_up(user)
-        expect(book.vote_by(user)).to eq(vote)
+        expect(book.vote_by(user).id).to eq(vote.id)
       end
     end
 

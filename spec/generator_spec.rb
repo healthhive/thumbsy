@@ -29,10 +29,6 @@ RSpec.describe "Thumbsy Generators" do
       expect(generator).to respond_to(:create_migration_file)
     end
 
-    it "has create_thumbsy_vote_model method" do
-      expect(generator).to respond_to(:create_thumbsy_vote_model)
-    end
-
     it "has show_readme method" do
       expect(generator).to respond_to(:show_readme)
     end

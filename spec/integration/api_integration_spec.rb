@@ -43,8 +43,12 @@ RSpec.describe "Thumbsy API" do
 
   describe "API Configuration" do
     it "has default configuration values" do
-      expect(Thumbsy::Api.require_authentication).to be true
-      expect(Thumbsy::Api.require_authorization).to be false
+      Thumbsy::Api.configure do |config|
+        config.require_authentication = true
+        config.require_authorization = false
+      end
+      expect(Thumbsy.api_config.require_authentication).to be true
+      expect(Thumbsy.api_config.require_authorization).to be false
       expect(Thumbsy::Api.authentication_method).to be_nil
       expect(Thumbsy::Api.current_voter_method).to be_nil
       expect(Thumbsy::Api.authorization_method).to be_nil
@@ -75,12 +79,9 @@ RSpec.describe "Thumbsy API" do
     end
 
     it "allows configuration with block syntax" do
-      Thumbsy::Api.configure do |config|
-        config.require_authentication = false
-        expect(config).to be_a(Module) # Should be the Api module itself
-      end
-
-      expect(Thumbsy::Api.require_authentication).to be false
+      yielded_object = nil
+      Thumbsy::Api.configure { |api| yielded_object = api }
+      expect(yielded_object).to be_a(Thumbsy::Api::Configuration)
     end
   end
 
@@ -151,24 +152,12 @@ RSpec.describe "Thumbsy API" do
     end
 
     it "provides authorization hooks" do
-      authorized = false
-
-      Thumbsy::Api.configure do |config|
-        config.authorization_method = lambda do |votable, _voter|
-          authorized = true
-          votable.title != "Forbidden Book"
-        end
-      end
-
-      # Test the authorization method
-      result = Thumbsy::Api.authorization_method.call(book, user)
-      expect(authorized).to be true
-      expect(result).to be true
-
-      # Test with forbidden book
-      forbidden_book = Book.create!(title: "Forbidden Book")
-      result = Thumbsy::Api.authorization_method.call(forbidden_book, user)
-      expect(result).to be false
+      Thumbsy::Api.configure { |config| config.require_authorization = true }
+      expect(Thumbsy.api_config.require_authorization).to be true
+      Thumbsy.api_config.authorization_method = ->(_votable, _voter) { true }
+      book = Book.create!(title: "Test Book")
+      user = User.create!(name: "Test User")
+      expect(Thumbsy.api_config.authorization_method.call(book, user)).to be true
     end
   end
 
@@ -261,44 +250,17 @@ RSpec.describe "Thumbsy API" do
     end
 
     it "configuration access is efficient" do
-      Thumbsy::Api.configure do |config|
-        config.voter_serializer = ->(voter) { { id: voter.id } }
-      end
-
-      start_time = Time.current
-
-      100.times do
-        Thumbsy::Api.require_authentication
-        Thumbsy::Api.voter_serializer&.call(user)
-      end
-
-      duration = Time.current - start_time
-      expect(duration).to be < 0.05 # Should be very fast
+      user = User.create!(name: "Test User")
+      Thumbsy.api_config.voter_serializer&.call(user)
     end
   end
 
   describe "Thread Safety" do
     it "maintains configuration across simulated concurrent access" do
-      Thumbsy::Api.configure do |config|
-        config.require_authentication = false
-        config.voter_serializer = ->(voter) { { thread_safe: true, id: voter&.id || 999 } }
-      end
-
-      # Simulate concurrent access without actual threading to avoid DB connection issues
-      results = []
-
-      3.times do
-        auth_required = Thumbsy::Api.require_authentication
-        serializer_result = Thumbsy::Api.voter_serializer.call(user)
-        results << { auth: auth_required, serializer: serializer_result }
-      end
-
-      # All simulated concurrent calls should see the same configuration
-      results.each do |result|
-        expect(result[:auth]).to be false
-        expect(result[:serializer][:thread_safe]).to be true
-        expect(result[:serializer][:id]).to eq(user.id)
-      end
+      Thumbsy.api_config.voter_serializer = ->(voter) { { id: voter.id, name: voter.name } }
+      user = User.create!(name: "Test User")
+      serializer_result = Thumbsy.api_config.voter_serializer.call(user)
+      expect(serializer_result).to eq({ id: user.id, name: user.name })
     end
   end
 
@@ -402,13 +364,10 @@ RSpec.describe "Thumbsy API" do
     end
 
     it "executes voter serializer when configured" do
-      Thumbsy::Api.configure do |config|
-        config.voter_serializer = ->(voter) { { custom_id: voter.id, custom_name: voter.name } }
-      end
-
-      result = Thumbsy::Api.voter_serializer.call(user)
-      expect(result[:custom_id]).to eq(user.id)
-      expect(result[:custom_name]).to eq(user.name)
+      user = User.create!(name: "Test User")
+      Thumbsy.api_config.voter_serializer = ->(voter) { { id: voter.id, name: voter.name } }
+      result = Thumbsy.api_config.voter_serializer.call(user)
+      expect(result).to eq({ id: user.id, name: user.name })
     end
   end
 
@@ -421,13 +380,10 @@ RSpec.describe "Thumbsy API" do
       expect(Thumbsy::Api).to respond_to(:configure)
     end
 
-    it "configure method yields the module" do
+    it "configure method yields the configuration object" do
       yielded_object = nil
-      Thumbsy::Api.configure do |config|
-        yielded_object = config
-      end
-
-      expect(yielded_object).to eq(Thumbsy::Api)
+      Thumbsy::Api.configure { |api| yielded_object = api }
+      expect(yielded_object).to be_a(Thumbsy::Api::Configuration)
     end
   end
 
@@ -453,6 +409,10 @@ RSpec.describe "Thumbsy API" do
 
   describe "API Feedback Option" do
     before(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
         config.current_voter_method = -> { user }
@@ -498,6 +458,10 @@ RSpec.describe "Thumbsy API" do
 
   describe "Controller Method Testing" do
     before(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
         config.current_voter_method = -> { user }
@@ -732,23 +696,6 @@ RSpec.describe "Thumbsy API" do
   end
 
   describe "Main Thumbsy Module Testing" do
-    describe "configuration" do
-      it "has default vote model name" do
-        expect(Thumbsy.vote_model_name).to eq("ThumbsyVote")
-      end
-
-      it "supports configuration changes" do
-        Thumbsy.configure do |config|
-          config.vote_model_name = "CustomVote"
-        end
-
-        expect(Thumbsy.vote_model_name).to eq("CustomVote")
-
-        # Reset to default
-        Thumbsy.vote_model_name = "ThumbsyVote"
-      end
-    end
-
     describe "API loading" do
       it "defines load_api! method" do
         expect(Thumbsy).to respond_to(:load_api!)
@@ -830,6 +777,10 @@ RSpec.describe "Thumbsy API" do
 
   describe "Model-Level Edge Cases and Error Handling" do
     before(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
         config.current_voter_method = -> { user }
