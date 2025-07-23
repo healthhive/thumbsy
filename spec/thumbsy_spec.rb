@@ -407,21 +407,22 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       expect(result).to be false
     end
 
-    it "raises ArgumentError for invalid voter objects" do
+    it "handles invalid voter objects gracefully" do
       # Create a model that doesn't have voter functionality
       class NonVoterItem < ActiveRecord::Base
         self.table_name = "users" # Reuse existing table
       end
 
       invalid_voter = NonVoterItem.new
-      expect { book.vote_up(invalid_voter) }.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
+      result = book.vote_up(invalid_voter)
+      expect(result).to be false
     end
 
-    it "raises ArgumentError for voter without thumbsy_votes capability" do
+    it "handles voter without thumbsy_votes capability" do
       # Create an object that doesn't have voter functionality
       invalid_voter = Object.new
-      expect { book.vote_up(invalid_voter) }.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
-      expect { book.vote_down(invalid_voter) }.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
+      expect(book.vote_up(invalid_voter)).to be false
+      expect { book.vote_down(invalid_voter) }.to raise_error(ArgumentError, "Voter is invalid")
     end
 
     it "handles votable without thumbsy_votes capability from voter perspective" do

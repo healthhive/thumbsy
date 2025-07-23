@@ -26,7 +26,7 @@ module Thumbsy
 
           # If it's an integer (corrupted enum), use the global feedback options
           feedback_options = Thumbsy.feedback_options
-          return nil unless feedback_options&.is_a?(Array)
+          return nil unless feedback_options.is_a?(Array)
 
           feedback_options[feedback_option] if feedback_option < feedback_options.length
         end
