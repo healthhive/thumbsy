@@ -33,22 +33,26 @@ RSpec.describe "Thumbsy Module Edge Cases" do
         expect { book.vote_up(nil) }.to raise_error(ArgumentError)
       end
 
-      it "handles voter without thumbsy_votes capability" do
-        expect(book.vote_up(non_voter)).to be false
+      it "raises ArgumentError when voter doesn't have thumbsy_votes capability" do
+        expect { book.vote_up(non_voter) }.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
       end
 
-      it "handles voter that doesn't respond to thumbsy_votes" do
+      it "raises ArgumentError when voter doesn't respond to thumbsy_votes" do
         voter_without_association = double("voter")
         allow(voter_without_association).to receive(:respond_to?).with(:thumbsy_votes).and_return(false)
 
-        expect(book.vote_up(voter_without_association)).to be false
+        expect do
+          book.vote_up(voter_without_association)
+        end.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
       end
 
-      it "handles voter that responds to thumbsy_votes but returns false" do
-        # Create a real object that responds to thumbsy_votes but doesn't have the association
+      it "raises ArgumentError when voter doesn't have thumbsy_votes association" do
+        # Create a real object that doesn't have the thumbsy_votes association
         voter_without_association = NonVoterItem.create!(name: "Test NonVoter")
 
-        expect(book.vote_up(voter_without_association)).to be false
+        expect do
+          book.vote_up(voter_without_association)
+        end.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
       end
 
       it "handles ActiveRecord::RecordInvalid exceptions" do
@@ -85,8 +89,8 @@ RSpec.describe "Thumbsy Module Edge Cases" do
         expect { book.vote_down(nil) }.to raise_error(ArgumentError)
       end
 
-      it "handles voter without thumbsy_votes capability" do
-        expect(book.vote_down(non_voter)).to be false
+      it "raises ArgumentError when voter doesn't have thumbsy_votes capability" do
+        expect { book.vote_down(non_voter) }.to raise_error(ArgumentError, "Voter must respond to :thumbsy_votes")
       end
 
       it "handles ActiveRecord::RecordInvalid exceptions" do

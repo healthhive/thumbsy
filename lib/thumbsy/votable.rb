@@ -13,7 +13,7 @@ module Thumbsy
     end
 
     def vote_up(voter, comment: nil, feedback_option: nil)
-      return false if voter && !voter.respond_to?(:thumbsy_votes)
+      raise ArgumentError, "Voter must respond to :thumbsy_votes" if voter && !voter.respond_to?(:thumbsy_votes)
 
       ThumbsyVote.vote_for(self, voter, true, comment: comment, feedback_option: feedback_option)
     rescue ActiveRecord::RecordInvalid
@@ -26,7 +26,7 @@ module Thumbsy
     end
 
     def vote_down(voter, comment: nil, feedback_option: nil)
-      return false if voter && !voter.respond_to?(:thumbsy_votes)
+      raise ArgumentError, "Voter must respond to :thumbsy_votes" if voter && !voter.respond_to?(:thumbsy_votes)
 
       ThumbsyVote.vote_for(self, voter, false, comment: comment, feedback_option: feedback_option)
     rescue ActiveRecord::RecordInvalid
