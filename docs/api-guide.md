@@ -231,7 +231,7 @@ end
 
 ```json
 {
-  "error": "Authentication required",
+  "message": "Error message",
   "errors": []
 }
 ```
@@ -240,7 +240,7 @@ end
 
 ```json
 {
-  "error": "Validation failed",
+  "message": "Validation failed",
   "errors": ["'invalid_option' is not a valid feedback_option"]
 }
 ```
@@ -415,7 +415,7 @@ All API responses follow a consistent format:
 **Error Response:**
 ```json
 {
-  "error": "Error message",
+  "message": "Error message",
   "errors": [...]
 }
 ```
@@ -437,7 +437,7 @@ The Thumbsy API provides convenient helper methods for common HTTP status codes:
 1. **Authentication Required**
    ```json
    {
-     "error": "Authentication required",
+     "message": "Authentication required",
      "errors": []
    }
    ```
@@ -445,7 +445,7 @@ The Thumbsy API provides convenient helper methods for common HTTP status codes:
 2. **Invalid Feedback Option**
    ```json
    {
-     "error": "Validation failed",
+     "message": "Validation failed",
      "errors": ["'invalid_option' is not a valid feedback_option"]
    }
    ```
@@ -453,7 +453,7 @@ The Thumbsy API provides convenient helper methods for common HTTP status codes:
 3. **Resource Not Found**
    ```json
    {
-     "error": "Resource not found",
+     "message": "Resource not found",
      "errors": []
    }
    ```
@@ -461,7 +461,15 @@ The Thumbsy API provides convenient helper methods for common HTTP status codes:
 4. **Authorization Failed**
    ```json
    {
-     "error": "Access denied",
+     "message": "Access denied",
+     "errors": []
+   }
+   ```
+
+5. **Invalid Voter**
+   ```json
+   {
+     "message": "Voter is invalid",
      "errors": []
    }
    ```
@@ -487,7 +495,7 @@ const handleVote = async (action, comment, feedbackOption) => {
       showSuccessMessage('Vote recorded successfully');
     } else {
       // Handle API error
-      showErrorMessage(response.error);
+      showErrorMessage(response.message);
     }
   } catch (error) {
     // Handle network/other errors
@@ -570,7 +578,7 @@ RSpec.describe "Thumbsy API" do
 
       expect(response).to have_http_status(:unprocessable_entity)
       json = JSON.parse(response.body)
-      expect(json["error"]).to eq("Failed to create vote")
+      expect(json["message"]).to eq("Failed to create vote")
     end
   end
 end
