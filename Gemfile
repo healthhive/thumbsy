@@ -26,6 +26,7 @@ group :development, :test do
   gem "rspec-rails", "~> 6.0"
 
   gem "database_cleaner-active_record", "~> 2.1"
+  gem "pry"
   gem "rspec_junit_formatter", "~> 0.6"
   gem "simplecov", "~> 0.22", require: false
 end

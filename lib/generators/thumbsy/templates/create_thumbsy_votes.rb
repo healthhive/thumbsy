@@ -2,11 +2,11 @@ class CreateThumbsyVotes < ActiveRecord::Migration[<%= ActiveRecord::Migration.c
   def change
     create_table :thumbsy_votes, id: :<%= @id_type %> do |t|
       t.references :votable, null: false, type: :<%= @id_type %>, polymorphic: true, index: false
-      t.references :voter, null: false, type: :<%= @id_type %>, polymorphic: true, index: true
+      t.references :voter, null: false, type: :<%= @id_type %>, polymorphic: true, index: false
       t.boolean :vote, null: false, default: false
       t.text :comment
-      <% if defined?(feedback_options) && feedback_options.present? %>
-        t.integer :feedback_option
+      <% if defined?(@feedback_options) && @feedback_options.present? %>
+      t.integer :feedback_option
       <% end %>
       t.timestamps null: false
     end

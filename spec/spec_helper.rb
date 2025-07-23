@@ -57,15 +57,44 @@ ActiveRecord::Schema.define do
     t.string :title
     t.timestamps
   end
+
+  # Add missing edge case tables
+  create_table :non_voter_items, force: true do |t|
+    t.string :name
+    t.timestamps
+  end
+
+  create_table :non_votable_items, force: true do |t|
+    t.string :name
+    t.timestamps
+  end
+
+  create_table :articles, force: true do |t|
+    t.string :title
+    t.text :content
+    t.timestamps
+  end
 end
 
 # Load the gem
 require "thumbsy"
 
+# Require the ThumbsyVote model from the gem
+require_relative "../lib/thumbsy/models/thumbsy_vote"
+
 # Ensure Thumbsy extension is applied to ActiveRecord::Base for test macros
 ActiveRecord::Base.extend(Thumbsy::Extension)
 
 RSpec.configure do |config|
+  # Set up Thumbsy config for tests
+  Thumbsy.configure do |c|
+    c.feedback_options = %w[like dislike funny]
+    c.api do |api|
+      api.require_authentication = false
+      api.authentication_method = nil
+      api.current_voter_method = -> { User.first }
+    end
+  end
   config.mock_with :rspec
   config.order = "random"
   config.filter_run_when_matching :focus
@@ -83,65 +112,7 @@ RSpec.configure do |config|
     end
   end
 
-  # Dynamically define ThumbsyVote model for tests using the generator template
-  config.before(:suite) do
-    Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
-
-    # Read the generator template
-    template_path = File.expand_path("../lib/generators/thumbsy/templates/thumbsy_vote.rb.tt", __dir__)
-    template_content = File.read(template_path)
-
-    # Use default feedback options (same as generator default)
-    feedback_options = %w[like dislike funny]
-
-    # Process the template manually by replacing the ERB placeholder
-    model_code = template_content.gsub(
-      "<%== feedback_options.map(&:inspect).join(', ') %>",
-      feedback_options.map(&:inspect).join(", "),
-    )
-
-    # Evaluate the processed template safely
-    # rubocop:disable Security/Eval
-    eval(model_code, TOPLEVEL_BINDING)
-    # rubocop:enable Security/Eval
-
-    # Create tables for test models
-    ActiveRecord::Base.connection.create_table(:thumbsy_votes, force: true) do |t|
-      t.references :votable, polymorphic: true, null: false
-      t.references :voter, polymorphic: true, null: false
-      t.boolean :vote, null: false
-      t.text :comment
-      t.integer :feedback_option
-      t.timestamps
-    end
-
-    ActiveRecord::Base.connection.create_table(:users, force: true) do |t|
-      t.string :name
-      t.timestamps
-    end
-
-    ActiveRecord::Base.connection.create_table(:books, force: true) do |t|
-      t.string :title
-      t.timestamps
-    end
-
-    # Create tables for edge case test models
-    ActiveRecord::Base.connection.create_table(:non_votable_items, force: true) do |t|
-      t.string :name
-      t.timestamps
-    end
-
-    ActiveRecord::Base.connection.create_table(:non_voter_items, force: true) do |t|
-      t.string :name
-      t.timestamps
-    end
-
-    ActiveRecord::Base.connection.create_table(:articles, force: true) do |t|
-      t.string :title
-      t.text :content
-      t.timestamps
-    end
-  end
+  # Remove obsolete dynamic model generation for ThumbsyVote
 
   config.expect_with :rspec do |expectations|
     expectations.syntax = :expect

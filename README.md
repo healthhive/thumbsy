@@ -9,7 +9,7 @@ Includes optional JSON API endpoints.
 
 ## Requirements
 
-- **Ruby**: 3.2.0 or newer
+- **Ruby**: 3.3.0 or newer
 - **Rails**: 7.1, 7.2, or 8.0+
 - **Database**: SQLite, PostgreSQL, or MySQL (any ActiveRecord-supported database)
 
@@ -191,7 +191,7 @@ end
 
 ✅ **Test Suite**: Complete RSpec tests included
 
-✅ **Template-Based**: Model generated from templates for consistency
+✅ **Gem-Provided Model**: Model is provided directly by the gem for consistency
 
 ## Use Cases
 
@@ -233,10 +233,10 @@ bundle exec rspec spec/api_integration_spec.rb
 
 ### Testing Across Rails Versions
 
-Thumbsy is tested against multiple Rails versions (7.1, 7.2, 8.0) and Ruby versions (3.2, 3.3, 3.4):
+Thumbsy is tested against multiple Rails versions (7.1, 7.2, 8.0) and Ruby versions (3.3, 3.4):
 
 ```bash
-# Test with a specific Rails version
+
 RAILS_VERSION=8.0 bundle update rails
 RAILS_VERSION=8.0 bundle exec rspec
 
@@ -248,7 +248,7 @@ ruby script/test_rails_versions.rb
 
 Our CI pipeline automatically tests all supported combinations:
 
-- **Ruby versions**: 3.2, 3.3, 3.4
+- **Ruby versions**: 3.3, 3.4
 - **Rails versions**: 7.1, 7.2, 8.0
 - **Total combinations**: 9 test matrices
 - **Coverage requirement**: 78%+

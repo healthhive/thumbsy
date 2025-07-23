@@ -5,14 +5,30 @@ require "thumbsy/extension"
 require "thumbsy/engine"
 require "thumbsy/votable"
 require "thumbsy/voter"
+require "thumbsy/configuration"
+require "thumbsy/api/configuration"
 
 module Thumbsy
-  # Basic configuration
-  mattr_accessor :vote_model_name
-  self.vote_model_name = "ThumbsyVote"
+  class << self
+    attr_accessor :config
+  end
 
   def self.configure
-    yield(self)
+    self.config ||= Configuration.new
+    yield(config)
+  end
+
+  def self.feedback_options
+    config&.feedback_options
+  end
+
+  def self.feedback_options=(options)
+    self.config ||= Configuration.new
+    config.feedback_options = options
+  end
+
+  def self.api_config
+    config&.api_config
   end
 
   # Load API functionality (optional)
@@ -34,3 +50,5 @@ end
 
 # Extend ActiveRecord when available (fallback if Rails engine doesn't load)
 ActiveRecord::Base.extend(Thumbsy::Extension) if defined?(ActiveRecord::Base) && !defined?(Thumbsy::Engine)
+
+require_relative "thumbsy/models/thumbsy_vote"

@@ -69,53 +69,58 @@ GET /books/1/votes
 
 ## API Configuration
 
-Configure the API in `config/initializers/thumbsy_api.rb`:
+Configure the API and feedback options in `config/initializers/thumbsy.rb` (centralized initializer):
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  # Authentication (required by default)
-  config.require_authentication = true
+Thumbsy.configure do |config|
+  config.feedback_options = %w[like dislike funny]
 
-  # Custom authentication method
-  config.authentication_method = proc do
-    authenticate_user! # Your auth method
-  end
-
-  # Set current voter
-  config.current_voter_method = proc do
-    current_user # Your current user method
-  end
-
-  # Authorization (optional)
-  config.require_authorization = false
-  config.authorization_method = proc do |votable, voter|
-    # Return true/false for access
-    votable.published? && !voter.banned?
-  end
-
-  # Custom voter serialization
-  config.voter_serializer = proc do |voter|
-    {
-      id: voter.id,
-      name: voter.name,
-      avatar: voter.avatar.attached? ? rails_blob_url(voter.avatar) : nil
-    }
+  config.api do |api|
+    api.require_authentication = true
+    api.authentication_method = proc do
+      # ...
+    end
+    api.current_voter_method = proc do
+      # ...
+    end
   end
 end
 ```
 
+If you use the `--feedback` option with the installer, e.g.:
+
+```sh
+rails generate thumbsy:install --feedback=helpful,unhelpful,spam
+```
+
+The installer will generate an initializer with:
+
+```ruby
+Thumbsy.configure do |config|
+  config.feedback_options = %w[helpful unhelpful spam]
+end
+```
+
+**Note:**
+- The API generator (`rails generate thumbsy:api`) will add `require 'thumbsy/api'` and `Thumbsy::Api.load!` to the top of `config/initializers/thumbsy.rb` if not already present, instead of creating a separate initializer.
+- The `ThumbsyVote` model is provided by the gem and always uses the current value of `Thumbsy.feedback_options` for its enum and validation.
+
 ## Authentication Integration
+
+All authentication options are set inside the `config.api` block in your `thumbsy.rb` initializer. Here are common patterns:
 
 ### Devise Authentication
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  config.authentication_method = proc do
-    authenticate_user!
-  end
-
-  config.current_voter_method = proc do
-    current_user
+Thumbsy.configure do |config|
+  # ...
+  config.api do |api|
+    api.authentication_method = proc do
+      authenticate_user!
+    end
+    api.current_voter_method = proc do
+      current_user
+    end
   end
 end
 ```
@@ -123,20 +128,21 @@ end
 ### JWT Authentication
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  config.authentication_method = proc do
-    token = request.headers["Authorization"]&.split(" ")&.last
-
-    begin
-      decoded_token = JWT.decode(token, Rails.application.secret_key_base).first
-      @current_user = User.find(decoded_token["user_id"])
-    rescue JWT::DecodeError, ActiveRecord::RecordNotFound
-      head :unauthorized
+Thumbsy.configure do |config|
+  # ...
+  config.api do |api|
+    api.authentication_method = proc do
+      token = request.headers["Authorization"]&.split(" ")&.last
+      begin
+        decoded_token = JWT.decode(token, Rails.application.secret_key_base).first
+        @current_user = User.find(decoded_token["user_id"])
+      rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+        head :unauthorized
+      end
     end
-  end
-
-  config.current_voter_method = proc do
-    @current_user
+    api.current_voter_method = proc do
+      @current_user
+    end
   end
 end
 ```
@@ -144,15 +150,17 @@ end
 ### API Key Authentication
 
 ```ruby
-Thumbsy::Api.configure do |config|
-  config.authentication_method = proc do
-    api_key = request.headers["X-API-Key"]
-    @current_user = User.find_by(api_key: api_key)
-    head :unauthorized unless @current_user&.active?
-  end
-
-  config.current_voter_method = proc do
-    @current_user
+Thumbsy.configure do |config|
+  # ...
+  config.api do |api|
+    api.authentication_method = proc do
+      api_key = request.headers["X-API-Key"]
+      @current_user = User.find_by(api_key: api_key)
+      head :unauthorized unless @current_user&.active?
+    end
+    api.current_voter_method = proc do
+      @current_user
+    end
   end
 end
 ```
@@ -172,17 +180,11 @@ end
 - `comment` (optional): Text comment explaining the vote
 - `feedback_option` (optional): One of the configured feedback options (e.g., "like", "dislike", "funny")
 
-### Feedback Options
+## Feedback Options
 
-Feedback options are customizable when generating the model:
-
-```bash
-# Default options (like, dislike, funny)
-rails generate thumbsy:install
-
-# Custom options
-rails generate thumbsy:install --feedback=helpful,unhelpful,spam
-```
+- `feedback_option` is always a string key (e.g., "like", "dislike").
+- The API and serializer will always return the string value for feedback_option.
+- Invalid feedback options will result in a validation error.
 
 ## API Responses
 
@@ -190,7 +192,6 @@ rails generate thumbsy:install --feedback=helpful,unhelpful,spam
 
 ```json
 {
-  "success": true,
   "data": {
     "id": 123,
     "vote": true,
@@ -211,7 +212,6 @@ rails generate thumbsy:install --feedback=helpful,unhelpful,spam
 
 ```json
 {
-  "success": true,
   "data": {
     "voted": true,
     "vote_type": "up",
@@ -231,9 +231,8 @@ rails generate thumbsy:install --feedback=helpful,unhelpful,spam
 
 ```json
 {
-  "success": false,
-  "error": "Authentication required",
-  "errors": {}
+  "message": "Error message",
+  "errors": []
 }
 ```
 
@@ -241,13 +240,16 @@ rails generate thumbsy:install --feedback=helpful,unhelpful,spam
 
 ```json
 {
-  "success": false,
-  "error": "Validation failed",
-  "errors": {
-    "feedback_option": ["'invalid_option' is not a valid feedback_option"]
-  }
+  "message": "Validation failed",
+  "errors": ["'invalid_option' is not a valid feedback_option"]
 }
 ```
+
+## API Generator
+
+- The API generator (`rails generate thumbsy:api`) will **not** create a separate initializer.
+- It will add `require 'thumbsy/api'` and `Thumbsy::Api.load!` to the top of `config/initializers/thumbsy.rb` if not already present.
+- All API and feedback configuration is centralized in `thumbsy.rb`.
 
 ## Frontend Integration
 
@@ -399,40 +401,76 @@ export function useVote(votableType, votableId) {
 
 ## Error Handling
 
+### Response Format
+
+All API responses follow a consistent format:
+
+**Success Response:**
+```json
+{
+  "data": { ... }
+}
+```
+
+**Error Response:**
+```json
+{
+  "message": "Error message",
+  "errors": [...]
+}
+```
+
+### Helper Methods
+
+The Thumbsy API provides convenient helper methods for common HTTP status codes:
+
+- `render_success(data, status)` - Renders success response (default status: 200)
+- `render_error(message, status, errors)` - Renders error response (default status: 400)
+- `render_unauthorized(message)` - Renders 401 Unauthorized
+- `render_forbidden(message)` - Renders 403 Forbidden
+- `render_not_found(exception)` - Renders 404 Not Found
+- `render_unprocessable_entity(message, errors)` - Renders 422 Unprocessable Entity
+- `render_bad_request(message)` - Renders 400 Bad Request
+
 ### Common Error Scenarios
 
 1. **Authentication Required**
    ```json
    {
-     "success": false,
-     "error": "Authentication required"
+     "message": "Authentication required",
+     "errors": []
    }
    ```
 
 2. **Invalid Feedback Option**
    ```json
    {
-     "success": false,
-     "error": "Validation failed",
-     "errors": {
-       "feedback_option": ["'invalid_option' is not a valid feedback_option"]
-     }
+     "message": "Validation failed",
+     "errors": ["'invalid_option' is not a valid feedback_option"]
    }
    ```
 
 3. **Resource Not Found**
    ```json
    {
-     "success": false,
-     "error": "Resource not found"
+     "message": "Resource not found",
+     "errors": []
    }
    ```
 
 4. **Authorization Failed**
    ```json
    {
-     "success": false,
-     "error": "Access denied"
+     "message": "Access denied",
+     "errors": []
+   }
+   ```
+
+5. **Invalid Voter**
+   ```json
+   {
+     "message": "Voter is invalid",
+     "errors": []
    }
    ```
 
@@ -452,12 +490,12 @@ const handleVote = async (action, comment, feedbackOption) => {
       response = await removeVote();
     }
 
-    if (response.success) {
+    if (response.data) {
       // Handle success
       showSuccessMessage('Vote recorded successfully');
     } else {
       // Handle API error
-      showErrorMessage(response.error);
+      showErrorMessage(response.message);
     }
   } catch (error) {
     // Handle network/other errors
@@ -465,7 +503,7 @@ const handleVote = async (action, comment, feedbackOption) => {
       showErrorMessage('Please log in to vote');
     } else if (error.response?.status === 422) {
       const data = await error.response.json();
-      showErrorMessage(data.errors?.feedback_option?.[0] || 'Invalid vote data');
+      showErrorMessage(data.errors?.[0] || 'Invalid vote data');
     } else {
       showErrorMessage('Failed to record vote. Please try again.');
     }
@@ -540,8 +578,64 @@ RSpec.describe "Thumbsy API" do
 
       expect(response).to have_http_status(:unprocessable_entity)
       json = JSON.parse(response.body)
-      expect(json["errors"]["feedback_option"]).to include("'invalid' is not a valid feedback_option")
+      expect(json["message"]).to eq("Failed to create vote")
     end
+  end
+end
+```
+
+### Custom Controller Example
+
+If you need to extend the Thumbsy API with custom endpoints, you can use the helper methods:
+
+```ruby
+# app/controllers/api/v1/custom_votes_controller.rb
+class Api::V1::CustomVotesController < Thumbsy::Api::ApplicationController
+  before_action :find_votable
+
+  def bulk_vote
+    votes_data = params[:votes]
+
+    if votes_data.blank?
+      return render_bad_request("Votes data is required")
+    end
+
+    results = []
+    errors = []
+
+    votes_data.each do |vote_data|
+      begin
+        vote = @votable.vote_up(current_voter,
+                               comment: vote_data[:comment],
+                               feedback_option: vote_data[:feedback_option])
+
+        if vote && vote.persisted?
+          results << { id: vote.id, status: "created" }
+        else
+          errors << { data: vote_data, error: "Failed to create vote" }
+        end
+      rescue => e
+        errors << { data: vote_data, error: e.message }
+      end
+    end
+
+    if errors.empty?
+      render_success({ results: results, message: "All votes created successfully" })
+    else
+      error_messages = errors.map { |e| e[:error] }
+      render_unprocessable_entity("Some votes failed", { errors: error_messages })
+    end
+  end
+
+  private
+
+  def find_votable
+    votable_class = params[:votable_type].constantize
+    @votable = votable_class.find(params[:votable_id])
+  rescue NameError
+    render_bad_request("Invalid votable type")
+  rescue ActiveRecord::RecordNotFound
+    render_not_found(nil)
   end
 end
 ```

@@ -18,13 +18,23 @@ module Thumbsy
       ThumbsyVote.vote_for(self, voter, true, comment: comment, feedback_option: feedback_option)
     rescue ActiveRecord::RecordInvalid
       false
+    rescue ArgumentError => e
+      # Only catch ArgumentError for invalid feedback options, not for nil voters/votables
+      raise e unless e.message.include?("is not a valid feedback_option")
+
+      false
     end
 
     def vote_down(voter, comment: nil, feedback_option: nil)
-      return false if voter && !voter.respond_to?(:thumbsy_votes)
+      raise ArgumentError, "Voter is invalid" if voter && !voter.respond_to?(:thumbsy_votes)
 
       ThumbsyVote.vote_for(self, voter, false, comment: comment, feedback_option: feedback_option)
     rescue ActiveRecord::RecordInvalid
+      false
+    rescue ArgumentError => e
+      # Only catch ArgumentError for invalid feedback options, not for nil voters/votables
+      raise e unless e.message.include?("is not a valid feedback_option")
+
       false
     end
 

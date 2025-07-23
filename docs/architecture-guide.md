@@ -10,39 +10,55 @@ Thumbsy follows the principle of **progressive enhancement** and **separation of
 - **Clean separation**: Core and API components are architecturally isolated
 - **Performance conscious**: Unused features don't impact performance
 - **Rails conventions**: Follows Rails patterns and best practices
-- **Template-based**: Models generated from templates ensure consistency
+- **Gem-provided model**: The ThumbsyVote model is provided directly by the gem for consistency
 
 ## Architecture Overview
 
 ```
 thumbsy/
-├── lib/thumbsy/           # Core functionality (always loaded)
-│   ├── votable.rb         # ActiveRecord methods for votable models
-│   ├── voter.rb           # ActiveRecord methods for voter models
-│   ├── engine.rb          # Basic Rails integration
-│   └── version.rb         # Gem version
+├── lib/
+│   └── thumbsy/
+│       ├── votable.rb           # Votable concern
+│       ├── voter.rb             # Voter concern
+│       ├── engine.rb            # Rails engine for core
+│       ├── api.rb               # API loader
+│       ├── configuration.rb     # Core configuration
+│       ├── version.rb           # Gem version
+│       ├── extension.rb         # (optional) Extension hooks
+│       ├── models/
+│       │   └── thumbsy_vote.rb  # Gem-provided vote model
+│       └── api/
+│           ├── engine.rb        # API engine
+│           ├── routes.rb        # API routes
+│           ├── configuration.rb # API configuration
+│           ├── controllers/
+│           │   ├── application_controller.rb
+│           │   └── votes_controller.rb
+│           └── serializers/
+│               └── vote_serializer.rb
 │
-├── lib/thumbsy/api/       # Optional API (loaded on demand)
-│   ├── controllers/       # API controllers
-│   │   ├── application_controller.rb
-│   │   └── votes_controller.rb
-│   ├── engine.rb          # API routes and configuration
-│   ├── routes.rb          # API routing
-│   └── test_helpers.rb    # API testing utilities
+├── lib/generators/
+│   └── thumbsy/
+│       ├── install_generator.rb # Core install generator
+│       ├── api_generator.rb     # API generator
+│       └── templates/
+│           ├── create_thumbsy_votes.rb # Migration template
+│           ├── thumbsy.rb              # Initializer template (used)
+│           ├── thumbsy_api.rb          # Legacy API initializer template (not used for new installs)
+│           └── README                  # Generator usage info
 │
-├── lib/generators/        # Rails generators
-│   ├── thumbsy/
-│   │   ├── install_generator.rb    # Core installation
-│   │   └── api_generator.rb        # API installation
-│   └── templates/         # Generator templates
-│       ├── create_thumbsy_votes.rb # Migration template
-│       ├── thumbsy_vote.rb.tt      # Model template
-│       └── thumbsy_api.rb          # API template
-│
-└── app/                   # Rails app structure (generated)
-    └── models/
-        └── thumbsy_vote.rb # Generated vote model (optional)
+├── config/
+│   └── initializers/
+│       └── thumbsy.rb          # Centralized initializer (generated)
 ```
+
+**Key Points:**
+- The `ThumbsyVote` model is provided by the gem in `lib/thumbsy/models/thumbsy_vote.rb` and is not generated in your app.
+- The API is organized under `lib/thumbsy/api/` with controllers, serializers, engine, routes, and configuration.
+- There is no `test_helpers.rb` in the API directory.
+- The generators are under `lib/generators/thumbsy/` with `install_generator.rb`, `api_generator.rb`, and a `templates/` directory.
+- The `templates/` directory contains `thumbsy_api.rb` as a legacy template, but new installs use `thumbsy.rb` for the initializer and do not generate a separate `thumbsy_api.rb`.
+- The initializer is always generated as `config/initializers/thumbsy.rb` and contains all configuration (core and API).
 
 ## Core Components
 
@@ -130,9 +146,9 @@ end
 - Efficient querying with proper associations
 - Graceful handling of invalid votables (returns false)
 
-### 3. Vote Model (Template-Based)
+### 3. Vote Model (Gem-Provided)
 
-The core `ThumbsyVote` model is generated from a template and handles the actual vote records:
+The core `ThumbsyVote` model is provided directly by the gem and handles the actual vote records:
 
 ```ruby
 class ThumbsyVote < ActiveRecord::Base
@@ -193,7 +209,7 @@ end
 
 **Key Design Decisions:**
 
-- **Template-based generation**: Model is generated from `thumbsy_vote.rb.tt` template
+- **Model provided by gem**: The ThumbsyVote model is provided directly by the gem and is not generated from a template
 - **Polymorphic design**: Allows maximum flexibility
 - **Boolean vote field**: Simple true/false for up/down votes
 - **Feedback options**: Customizable enum for additional vote metadata
@@ -205,90 +221,39 @@ end
 
 ### Install Generator
 
-The `Thumbsy::Generators::InstallGenerator` creates the core voting functionality:
+The `Thumbsy::Generators::InstallGenerator` sets up the core voting functionality:
 
-```ruby
-class InstallGenerator < Rails::Generators::Base
-  class_option :feedback, type: :array, default: %w[like dislike funny],
-                          desc: "Feedback options for votes (e.g. --feedback like dislike funny)"
+- **Location:** `lib/generators/thumbsy/install_generator.rb`
+- **Migration:** Generates `db/migrate/create_thumbsy_votes.rb` using the `create_thumbsy_votes.rb` template (with ERB variables for `id_type` and `feedback_options`).
+- **Initializer:** Generates `config/initializers/thumbsy.rb` using the `thumbsy.rb` template. All Thumbsy and API configuration is centralized here.
+- **No model is generated in your app.** The `ThumbsyVote` model is always provided by the gem in `lib/thumbsy/models/thumbsy_vote.rb`.
 
-  def create_migration_file
-    migration_template "create_thumbsy_votes.rb", "db/migrate/create_thumbsy_votes.rb"
-  end
+#### Usage
 
-  def create_thumbsy_vote_model
-    template "thumbsy_vote.rb.tt", "app/models/thumbsy_vote.rb", feedback_options: options[:feedback]
-  end
-end
+```bash
+# Default (UUID primary keys, default feedback options)
+rails generate thumbsy:install
+
+# Custom feedback options
+rails generate thumbsy:install --feedback=helpful,unhelpful,spam
+
+# Custom ID type (bigint or integer)
+rails generate thumbsy:install --id_type=bigint
+
+# Both options
+rails generate thumbsy:install --id_type=bigint --feedback=helpful,unhelpful,spam
 ```
 
-**Key Features:**
-- Customizable feedback options via `--feedback` flag
-- Template-based model generation
-- Proper migration with indexes
+#### Options
 
-### Template System
+- `--feedback=option1,option2,...`  Set custom feedback options (default: like, dislike, funny)
+- `--id_type=uuid|bigint|integer`   Set primary key type for the votes table (default: uuid)
 
-The model template (`thumbsy_vote.rb.tt`) ensures consistency:
+#### Notes
 
-```erb
-# frozen_string_literal: true
-
-class ThumbsyVote < ActiveRecord::Base
-  belongs_to :votable, polymorphic: true
-  belongs_to :voter, polymorphic: true
-
-  validates :votable, presence: true
-  validates :voter, presence: true
-  validates :vote, inclusion: { in: [true, false] }
-  validates :voter_id, uniqueness: { scope: %i[voter_type votable_type votable_id] }
-
-  FEEDBACK_OPTIONS = <%== feedback_options.map(&:inspect).join(', ') %>.freeze
-
-  enum :feedback_option, FEEDBACK_OPTIONS.each_with_index.to_h
-
-  validates :feedback_option, inclusion: { in: FEEDBACK_OPTIONS }, allow_nil: true
-
-  scope :up_votes, -> { where(vote: true) }
-  scope :down_votes, -> { where(vote: false) }
-  scope :with_comments, -> { where.not(comment: [nil, ""]) }
-
-  def up_vote?
-    vote == true
-  end
-
-  def down_vote?
-    vote == false
-  end
-
-  def self.vote_for(votable, voter, vote_value, comment: nil, feedback_option: nil)
-    raise ArgumentError, "Voter cannot be nil" if voter.nil?
-    raise ArgumentError, "Votable cannot be nil" if votable.nil?
-
-    existing_vote = find_by(
-      votable: votable,
-      voter: voter
-    )
-
-    if existing_vote
-      existing_vote.update!(
-        vote: vote_value,
-        comment: comment,
-        feedback_option: feedback_option
-      )
-      existing_vote
-    else
-      create!(
-        votable: votable,
-        voter: voter,
-        vote: vote_value,
-        comment: comment,
-        feedback_option: feedback_option
-      )
-    end
-  end
-end
-```
+- The initializer is always generated as `config/initializers/thumbsy.rb` and contains all configuration (core and API).
+- The migration template uses ERB to inject the selected `id_type` and feedback options.
+- No model file is generated in your app; the gem-provided model is always used.
 
 ## Optional API Architecture
 
@@ -397,27 +362,51 @@ end
 
 ### Votes Table
 
+> **Note:** The actual migration template is generated and may use ERB for `id_type` and `feedback_options`.
+
+```ruby
+class CreateThumbsyVotes < ActiveRecord::Migration[7.0]
+  def change
+    create_table :thumbsy_votes, id: :uuid do |t| # id_type may be :uuid or :bigint
+      t.references :votable, null: false, type: :uuid, polymorphic: true, index: false
+      t.references :voter, null: false, type: :uuid, polymorphic: true, index: false
+      t.boolean :vote, null: false, default: false
+      t.text :comment
+      t.integer :feedback_option # Only present if feedback_options are configured
+      t.timestamps null: false
+    end
+
+    add_index :thumbsy_votes, [:votable_type, :votable_id, :voter_type, :voter_id],
+      unique: true, name: "index_thumbsy_votes_on_voter_and_votable"
+    add_index :thumbsy_votes, [:votable_type, :votable_id, :vote]
+    add_index :thumbsy_votes, [:voter_type, :voter_id, :vote]
+  end
+end
+```
+
+### Votes Table (SQL)
+
 ```sql
 CREATE TABLE thumbsy_votes (
-  id bigint PRIMARY KEY AUTO_INCREMENT,
+  id uuid PRIMARY KEY,
   voter_type varchar(255) NOT NULL,
-  voter_id bigint NOT NULL,
+  voter_id uuid NOT NULL,
   votable_type varchar(255) NOT NULL,
-  votable_id bigint NOT NULL,
-  vote boolean NOT NULL,
+  votable_id uuid NOT NULL,
+  vote boolean NOT NULL DEFAULT false,
   comment text,
   feedback_option integer,
   created_at timestamp NOT NULL,
-  updated_at timestamp NOT NULL,
-
-  -- Performance indexes
-  INDEX idx_thumbsy_votes_voter (voter_type, voter_id),
-  INDEX idx_thumbsy_votes_votable (votable_type, votable_id),
-  INDEX idx_thumbsy_votes_vote (vote),
-
-  -- Unique constraint to prevent duplicate votes
-  UNIQUE INDEX idx_thumbsy_unique_vote (voter_type, voter_id, votable_type, votable_id)
+  updated_at timestamp NOT NULL
 );
+
+-- Composite and unique indexes
+CREATE UNIQUE INDEX index_thumbsy_votes_on_voter_and_votable
+  ON thumbsy_votes (votable_type, votable_id, voter_type, voter_id);
+CREATE INDEX index_thumbsy_votes_on_votable_type_votable_id_vote
+  ON thumbsy_votes (votable_type, votable_id, vote);
+CREATE INDEX index_thumbsy_votes_on_voter_type_voter_id_vote
+  ON thumbsy_votes (voter_type, voter_id, vote);
 ```
 
 **Schema Design Decisions:**
@@ -429,28 +418,6 @@ CREATE TABLE thumbsy_votes (
 5. **Unique Constraint**: Prevents duplicate votes at database level
 6. **Optional Comments**: Text field for vote explanations
 7. **Timestamps**: Track when votes were created/modified
-
-### Migration Template
-
-```ruby
-class CreateThumbsyVotes < ActiveRecord::Migration[7.0]
-  def change
-    create_table :thumbsy_votes do |t|
-      t.references :votable, null: false, polymorphic: true, index: true
-      t.references :voter, null: false, polymorphic: true, index: true
-      t.boolean :vote, null: false
-      t.text :comment
-      t.integer :feedback_option
-      t.timestamps null: false
-
-      t.index %i[voter_type voter_id votable_type votable_id],
-              unique: true, name: "index_thumbsy_votes_on_voter_and_votable"
-      t.index %i[votable_type votable_id vote]
-      t.index %i[voter_type voter_id vote]
-    end
-  end
-end
-```
 
 ## Performance Considerations
 
@@ -537,27 +504,3 @@ RSpec.describe "Thumbsy API" do
     end
   end
 end
-```
-
-### Test Model Generation
-
-Tests use the same template system as production:
-
-```ruby
-# spec/spec_helper.rb
-config.before(:suite) do
-  # Dynamically generate ThumbsyVote model from template
-  template_path = File.expand_path("../lib/generators/thumbsy/templates/thumbsy_vote.rb.tt", __dir__)
-  template_content = File.read(template_path)
-  feedback_options = %w[like dislike funny]
-
-  model_code = template_content.gsub(
-    '<%== feedback_options.map(&:inspect).join(\', \') %>',
-    feedback_options.map(&:inspect).join(', ')
-  )
-
-  eval(model_code, TOPLEVEL_BINDING)
-end
-```
-
-This ensures test models always match production models.

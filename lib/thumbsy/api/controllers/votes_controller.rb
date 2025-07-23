@@ -11,10 +11,10 @@ module Thumbsy
         vote = @votable.vote_up(current_voter, comment: vote_params[:comment],
                                                feedback_option: vote_params[:feedback_option])
 
-        if vote&.persisted?
+        if vote && vote.persisted?
           render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json, :created)
         else
-          render_error("Failed to create vote", :unprocessable_entity)
+          render_unprocessable_entity("Failed to create vote")
         end
       end
 
@@ -23,10 +23,10 @@ module Thumbsy
         vote = @votable.vote_down(current_voter, comment: vote_params[:comment],
                                                  feedback_option: vote_params[:feedback_option])
 
-        if vote&.persisted?
+        if vote && vote.persisted?
           render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json, :created)
         else
-          render_error("Failed to create vote", :unprocessable_entity)
+          render_unprocessable_entity("Failed to create vote")
         end
       end
 
@@ -37,7 +37,7 @@ module Thumbsy
         if removed
           render_success({ message: "Vote removed" })
         else
-          render_error("No vote found to remove", :not_found)
+          render_not_found(nil)
         end
       end
 
@@ -96,14 +96,16 @@ module Thumbsy
         votable_class = params[:votable_type].constantize
         @votable = votable_class.find(params[:votable_id])
       rescue NameError
-        render_error("Invalid votable type", :bad_request)
+        render_bad_request("Invalid votable type")
+      rescue ActiveRecord::RecordNotFound
+        render_not_found(nil)
       end
 
       def check_votable_permissions
         return unless Thumbsy::Api.authorization_method
 
         authorized = instance_exec(@votable, current_voter, &Thumbsy::Api.authorization_method)
-        render_error("Access denied", :forbidden) unless authorized
+        render_forbidden unless authorized
       end
 
       def authorization_required?

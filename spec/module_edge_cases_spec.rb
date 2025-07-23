@@ -85,8 +85,8 @@ RSpec.describe "Thumbsy Module Edge Cases" do
         expect { book.vote_down(nil) }.to raise_error(ArgumentError)
       end
 
-      it "handles voter without thumbsy_votes capability" do
-        expect(book.vote_down(non_voter)).to be false
+      it "raises ArgumentError when voter doesn't have thumbsy_votes capability" do
+        expect { book.vote_down(non_voter) }.to raise_error(ArgumentError, "Voter is invalid")
       end
 
       it "handles ActiveRecord::RecordInvalid exceptions" do
@@ -184,7 +184,7 @@ RSpec.describe "Thumbsy Module Edge Cases" do
 
       it "returns vote object for existing vote" do
         vote = book.vote_up(user)
-        expect(book.vote_by(user)).to eq(vote)
+        expect(book.vote_by(user).id).to eq(vote.id)
       end
     end
 

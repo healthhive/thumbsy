@@ -39,20 +39,8 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
   end
 
   describe "Module Configuration and Loading" do
-    it "supports configure method with block" do
-      original_value = Thumbsy.vote_model_name
-
-      Thumbsy.configure do |config|
-        config.vote_model_name = "CustomVote"
-      end
-
-      expect(Thumbsy.vote_model_name).to eq("CustomVote")
-
-      # Reset to original
-      Thumbsy.vote_model_name = original_value
-    end
-
     it "supports load_api! method" do
+      require File.expand_path("../lib/thumbsy/api.rb", __dir__)
       # This may raise an error in non-Rails environments, which is expected
 
       Thumbsy.load_api!
@@ -68,6 +56,7 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
     end
 
     it "autoloads Api module via const_missing" do
+      require File.expand_path("../lib/thumbsy/api.rb", __dir__)
       # Test that accessing Api loads it successfully
       # This works because Api is autoloaded when accessed
       expect(Thumbsy::Api).to be_a(Module)
@@ -433,7 +422,7 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       # Create an object that doesn't have voter functionality
       invalid_voter = Object.new
       expect(book.vote_up(invalid_voter)).to be false
-      expect(book.vote_down(invalid_voter)).to be false
+      expect { book.vote_down(invalid_voter) }.to raise_error(ArgumentError, "Voter is invalid")
     end
 
     it "handles votable without thumbsy_votes capability from voter perspective" do
@@ -644,22 +633,59 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
   end
 
   describe "Feedback Option Validation" do
-    let(:vote) { ThumbsyVote.new(votable: book, voter: user, vote: true) }
+    before(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+    end
 
     it "accepts valid feedback_option values" do
-      ThumbsyVote::FEEDBACK_OPTIONS.each do |option|
+      Thumbsy.feedback_options.each do |option|
+        vote = ThumbsyVote.new(votable: book, voter: user, vote: true)
         vote.feedback_option = option
         expect(vote).to be_valid, "expected '#{option}' to be valid"
       end
     end
 
     it "allows feedback_option to be nil" do
+      vote = ThumbsyVote.new(votable: book, voter: user, vote: true)
       vote.feedback_option = nil
       expect(vote).to be_valid
     end
 
     it "rejects invalid feedback_option values" do
+      vote = ThumbsyVote.new(votable: book, voter: user, vote: true)
       expect { vote.feedback_option = "invalid_option" }.to raise_error(ArgumentError)
+    end
+  end
+
+  describe "Feedback Option Configuration" do
+    before(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+    end
+
+    after(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+    end
+
+    it "does not define feedback_option enum or validation when feedback_options is nil" do
+      Thumbsy.feedback_options = nil
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+      expect(ThumbsyVote.respond_to?(:feedback_options)).to be false
+      expect(ThumbsyVote.validators.map(&:attributes).flatten).not_to include(:feedback_option)
+    end
+
+    it "defines feedback_option enum and validation when feedback_options is set" do
+      Thumbsy.feedback_options = %w[helpful unhelpful spam]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+      expect(ThumbsyVote.respond_to?(:feedback_options)).to be true
+      expect(ThumbsyVote.validators.map(&:attributes).flatten).to include(:feedback_option)
     end
   end
 
@@ -700,7 +726,7 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       vote = book.vote_up(user, comment: multiline_comment)
 
       expect(vote.comment).to eq(multiline_comment)
-      expect(book.votes_with_comments).to include(vote)
+      expect(book.votes_with_comments.map(&:id)).to include(vote.id)
     end
 
     it "handles unicode comments" do

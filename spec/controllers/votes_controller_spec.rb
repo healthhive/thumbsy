@@ -3,10 +3,10 @@
 require "spec_helper"
 require "action_controller"
 require "action_controller/api"
-require_relative "../../lib/thumbsy/api"
-require_relative "../../lib/thumbsy/api/controllers/application_controller"
-require_relative "../../lib/thumbsy/api/controllers/votes_controller"
-require_relative "../../lib/thumbsy/api/serializers/vote_serializer"
+require "thumbsy/api"
+require "thumbsy/api/controllers/application_controller"
+require "thumbsy/api/controllers/votes_controller"
+require "thumbsy/api/serializers/vote_serializer"
 
 class User < ActiveRecord::Base
   voter
@@ -28,6 +28,11 @@ RSpec.describe Thumbsy::Api::VotesController do
   let(:controller) { described_class.new }
 
   before(:each) do
+    # Setup feedback options and reload model
+    Thumbsy.feedback_options = %w[like dislike funny]
+    Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+    load "lib/thumbsy/models/thumbsy_vote.rb"
+
     # Reset configuration before each test
     Thumbsy::Api.configure do |config|
       config.require_authentication = false
@@ -77,10 +82,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       allow(controller).to receive(:vote_params).and_return({})
       allow(book).to receive(:vote_up).and_return(nil)
 
-      expect(controller).to receive(:render_error).with(
-        "Failed to create vote",
-        :unprocessable_entity,
-      )
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
 
       controller.vote_up
     end
@@ -89,7 +91,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       failed_vote = double("vote", persisted?: false)
       allow(book).to receive(:vote_up).and_return(failed_vote)
 
-      expect(controller).to receive(:render_error).with("Failed to create vote", :unprocessable_entity)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
       controller.send(:vote_up)
     end
   end
@@ -121,7 +123,7 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "handles failed vote creation" do
       allow(book).to receive(:vote_down).and_return(nil)
 
-      expect(controller).to receive(:render_error).with("Failed to create vote", :unprocessable_entity)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
       controller.send(:vote_down)
     end
   end
@@ -145,10 +147,7 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "handles when no vote exists" do
       allow(book).to receive(:remove_vote).and_return(false)
 
-      expect(controller).to receive(:render_error).with(
-        "No vote found to remove",
-        :not_found,
-      )
+      expect(controller).to receive(:render_not_found).with(nil)
 
       controller.remove
     end
@@ -252,6 +251,11 @@ RSpec.describe Thumbsy::Api::VotesController do
 
   describe "Integration Flow Tests" do
     before do
+      # Ensure model is loaded with correct feedback options
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       allow(controller).to receive(:find_votable)
       controller.instance_variable_set(:@votable, book)
     end
@@ -395,7 +399,8 @@ RSpec.describe Thumbsy::Api::VotesController do
                                                            votable_id: "999999",
                                                          })
 
-        expect { controller.send(:find_votable) }.to raise_error(ActiveRecord::RecordNotFound)
+        expect(controller).to receive(:render_error).with("Resource not found", :not_found)
+        controller.send(:find_votable)
       end
 
       it "finds valid votable successfully" do
@@ -499,6 +504,11 @@ RSpec.describe Thumbsy::Api::VotesController do
 
   describe "Serializer Integration" do
     before do
+      # Ensure model is loaded with correct feedback options
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
       allow(controller).to receive(:find_votable)
       controller.instance_variable_set(:@votable, book)
     end

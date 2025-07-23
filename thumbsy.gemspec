@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
                        "to your Rails models with comments support"
   spec.homepage      = "https://github.com/healthhive/thumbsy"
   spec.license       = "MIT"
-  spec.required_ruby_version = Gem::Requirement.new(">= 3.2.0")
+  spec.required_ruby_version = Gem::Requirement.new(">= 3.3.0")
 
   spec.metadata["allowed_push_host"] = "https://rubygems.org"
   spec.metadata["homepage_uri"] = spec.homepage

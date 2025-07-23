@@ -2,27 +2,44 @@
 
 module Thumbsy
   module Api
-    # API configuration
-    mattr_accessor :require_authentication
-    self.require_authentication = true
+    def self.require_authentication
+      Thumbsy.api_config.require_authentication
+    end
 
-    mattr_accessor :require_authorization
-    self.require_authorization = false
+    def self.authentication_method
+      Thumbsy.api_config.authentication_method
+    end
 
-    mattr_accessor :authentication_method
-    self.authentication_method = nil
+    def self.current_voter_method
+      Thumbsy.api_config.current_voter_method
+    end
 
-    mattr_accessor :current_voter_method
-    self.current_voter_method = nil
+    def self.require_authorization
+      Thumbsy.api_config.require_authorization
+    end
 
-    mattr_accessor :authorization_method
-    self.authorization_method = nil
+    def self.require_authorization=(value)
+      Thumbsy.api_config.require_authorization = value
+    end
 
-    mattr_accessor :voter_serializer
-    self.voter_serializer = nil
+    def self.authorization_method
+      Thumbsy.api_config.authorization_method
+    end
+
+    def self.authorization_method=(value)
+      Thumbsy.api_config.authorization_method = value
+    end
+
+    def self.voter_serializer
+      Thumbsy.api_config.voter_serializer
+    end
+
+    def self.voter_serializer=(value)
+      Thumbsy.api_config.voter_serializer = value
+    end
 
     def self.configure
-      yield(self)
+      yield(Thumbsy.api_config)
     end
 
     # Load API components
