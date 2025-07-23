@@ -7,6 +7,15 @@ class ThumbsyVote < ActiveRecord::Base
     validates :feedback_option, inclusion: { in: feedback_options }, allow_nil: true
   end
 
+  # Lazy setup of feedback options when they become available
+  def self.setup_feedback_options!
+    return if Thumbsy.feedback_options.blank?
+    return if respond_to?(:feedback_options) # Already set up
+
+    enum :feedback_option, Thumbsy.feedback_options.each_with_index.to_h
+    validates :feedback_option, inclusion: { in: Thumbsy.feedback_options }, allow_nil: true
+  end
+
   belongs_to :votable, polymorphic: true
   belongs_to :voter, polymorphic: true
 
@@ -30,6 +39,9 @@ class ThumbsyVote < ActiveRecord::Base
   def self.vote_for(votable, voter, vote_value, comment: nil, feedback_option: nil)
     raise ArgumentError, "Voter cannot be nil" if voter.nil?
     raise ArgumentError, "Votable cannot be nil" if votable.nil?
+
+    # Ensure feedback options are set up
+    setup_feedback_options!
 
     existing_vote = find_by(
       votable: votable,

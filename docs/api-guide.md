@@ -192,7 +192,6 @@ end
 
 ```json
 {
-  "success": true,
   "data": {
     "id": 123,
     "vote": true,
@@ -213,7 +212,6 @@ end
 
 ```json
 {
-  "success": true,
   "data": {
     "voted": true,
     "vote_type": "up",
@@ -233,9 +231,8 @@ end
 
 ```json
 {
-  "success": false,
   "error": "Authentication required",
-  "errors": {}
+  "errors": []
 }
 ```
 
@@ -243,11 +240,8 @@ end
 
 ```json
 {
-  "success": false,
   "error": "Validation failed",
-  "errors": {
-    "feedback_option": ["'invalid_option' is not a valid feedback_option"]
-  }
+  "errors": ["'invalid_option' is not a valid feedback_option"]
 }
 ```
 
@@ -407,40 +401,68 @@ export function useVote(votableType, votableId) {
 
 ## Error Handling
 
+### Response Format
+
+All API responses follow a consistent format:
+
+**Success Response:**
+```json
+{
+  "data": { ... }
+}
+```
+
+**Error Response:**
+```json
+{
+  "error": "Error message",
+  "errors": [...]
+}
+```
+
+### Helper Methods
+
+The Thumbsy API provides convenient helper methods for common HTTP status codes:
+
+- `render_success(data, status)` - Renders success response (default status: 200)
+- `render_error(message, status, errors)` - Renders error response (default status: 400)
+- `render_unauthorized(message)` - Renders 401 Unauthorized
+- `render_forbidden(message)` - Renders 403 Forbidden
+- `render_not_found(exception)` - Renders 404 Not Found
+- `render_unprocessable_entity(message, errors)` - Renders 422 Unprocessable Entity
+- `render_bad_request(message)` - Renders 400 Bad Request
+
 ### Common Error Scenarios
 
 1. **Authentication Required**
    ```json
    {
-     "success": false,
-     "error": "Authentication required"
+     "error": "Authentication required",
+     "errors": []
    }
    ```
 
 2. **Invalid Feedback Option**
    ```json
    {
-     "success": false,
      "error": "Validation failed",
-     "errors": {
-       "feedback_option": ["'invalid_option' is not a valid feedback_option"]
-     }
+     "errors": ["'invalid_option' is not a valid feedback_option"]
    }
    ```
 
 3. **Resource Not Found**
    ```json
    {
-     "success": false,
-     "error": "Resource not found"
+     "error": "Resource not found",
+     "errors": []
    }
    ```
 
 4. **Authorization Failed**
    ```json
    {
-     "success": false,
-     "error": "Access denied"
+     "error": "Access denied",
+     "errors": []
    }
    ```
 
@@ -460,7 +482,7 @@ const handleVote = async (action, comment, feedbackOption) => {
       response = await removeVote();
     }
 
-    if (response.success) {
+    if (response.data) {
       // Handle success
       showSuccessMessage('Vote recorded successfully');
     } else {
@@ -473,7 +495,7 @@ const handleVote = async (action, comment, feedbackOption) => {
       showErrorMessage('Please log in to vote');
     } else if (error.response?.status === 422) {
       const data = await error.response.json();
-      showErrorMessage(data.errors?.feedback_option?.[0] || 'Invalid vote data');
+      showErrorMessage(data.errors?.[0] || 'Invalid vote data');
     } else {
       showErrorMessage('Failed to record vote. Please try again.');
     }
@@ -548,8 +570,64 @@ RSpec.describe "Thumbsy API" do
 
       expect(response).to have_http_status(:unprocessable_entity)
       json = JSON.parse(response.body)
-      expect(json["errors"]["feedback_option"]).to include("'invalid' is not a valid feedback_option")
+      expect(json["error"]).to eq("Failed to create vote")
     end
+  end
+end
+```
+
+### Custom Controller Example
+
+If you need to extend the Thumbsy API with custom endpoints, you can use the helper methods:
+
+```ruby
+# app/controllers/api/v1/custom_votes_controller.rb
+class Api::V1::CustomVotesController < Thumbsy::Api::ApplicationController
+  before_action :find_votable
+
+  def bulk_vote
+    votes_data = params[:votes]
+
+    if votes_data.blank?
+      return render_bad_request("Votes data is required")
+    end
+
+    results = []
+    errors = []
+
+    votes_data.each do |vote_data|
+      begin
+        vote = @votable.vote_up(current_voter,
+                               comment: vote_data[:comment],
+                               feedback_option: vote_data[:feedback_option])
+
+        if vote && vote.persisted?
+          results << { id: vote.id, status: "created" }
+        else
+          errors << { data: vote_data, error: "Failed to create vote" }
+        end
+      rescue => e
+        errors << { data: vote_data, error: e.message }
+      end
+    end
+
+    if errors.empty?
+      render_success({ results: results, message: "All votes created successfully" })
+    else
+      error_messages = errors.map { |e| e[:error] }
+      render_unprocessable_entity("Some votes failed", { errors: error_messages })
+    end
+  end
+
+  private
+
+  def find_votable
+    votable_class = params[:votable_type].constantize
+    @votable = votable_class.find(params[:votable_id])
+  rescue NameError
+    render_bad_request("Invalid votable type")
+  rescue ActiveRecord::RecordNotFound
+    render_not_found(nil)
   end
 end
 ```

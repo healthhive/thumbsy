@@ -9,7 +9,7 @@ require "thumbsy/api/controllers/application_controller"
 # Define a concrete test controller for direct testing
 class TestAppController < Thumbsy::Api::ApplicationController
   public :authenticate_voter!, :set_current_voter, :authentication_required?, :render_success, :render_error,
-         :render_not_found
+         :render_not_found, :render_unauthorized, :render_forbidden, :render_unprocessable_entity, :render_bad_request
 
   attr_writer :_request, :_response
 
@@ -31,6 +31,22 @@ class TestAppController < Thumbsy::Api::ApplicationController
 
   def test_render_not_found
     render_not_found(nil)
+  end
+
+  def test_render_unauthorized
+    render_unauthorized("Custom auth message")
+  end
+
+  def test_render_forbidden
+    render_forbidden("Custom forbidden message")
+  end
+
+  def test_render_unprocessable_entity
+    render_unprocessable_entity("Custom validation message", { field: ["error"] })
+  end
+
+  def test_render_bad_request
+    render_bad_request("Custom bad request message")
   end
 end
 
@@ -106,19 +122,47 @@ RSpec.describe TestAppController do
     it "render_success returns correct JSON and status" do
       controller.test_render_success
       expect(controller.response.status).to eq(201)
-      expect(JSON.parse(controller.response.body)).to eq({ "success" => true, "data" => { "foo" => "bar" } })
+      expect(JSON.parse(controller.response.body)).to eq({ "data" => { "foo" => "bar" } })
     end
     it "render_error returns correct JSON and status" do
       controller.test_render_error
       expect(controller.response.status).to eq(422)
-      expect(JSON.parse(controller.response.body)).to eq({ "success" => false, "error" => "Something went wrong",
-                                                           "errors" => { "details" => "error details" } })
+      expect(JSON.parse(controller.response.body)).to eq({ "error" => "Something went wrong",
+                                                           "errors" => ["error details"] })
     end
     it "render_not_found returns correct JSON and status" do
       controller.test_render_not_found
       expect(controller.response.status).to eq(404)
-      expect(JSON.parse(controller.response.body)).to eq({ "success" => false, "error" => "Resource not found",
-                                                           "errors" => {} })
+      expect(JSON.parse(controller.response.body)).to eq({ "error" => "Resource not found",
+                                                           "errors" => [] })
+    end
+
+    it "render_unauthorized returns correct JSON and status" do
+      controller.test_render_unauthorized
+      expect(controller.response.status).to eq(401)
+      expect(JSON.parse(controller.response.body)).to eq({ "error" => "Custom auth message",
+                                                           "errors" => [] })
+    end
+
+    it "render_forbidden returns correct JSON and status" do
+      controller.test_render_forbidden
+      expect(controller.response.status).to eq(403)
+      expect(JSON.parse(controller.response.body)).to eq({ "error" => "Custom forbidden message",
+                                                           "errors" => [] })
+    end
+
+    it "render_unprocessable_entity returns correct JSON and status" do
+      controller.test_render_unprocessable_entity
+      expect(controller.response.status).to eq(422)
+      expect(JSON.parse(controller.response.body)).to eq({ "error" => "Custom validation message",
+                                                           "errors" => ["error"] })
+    end
+
+    it "render_bad_request returns correct JSON and status" do
+      controller.test_render_bad_request
+      expect(controller.response.status).to eq(400)
+      expect(JSON.parse(controller.response.body)).to eq({ "error" => "Custom bad request message",
+                                                           "errors" => [] })
     end
   end
 end

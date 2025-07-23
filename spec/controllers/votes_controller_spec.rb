@@ -82,10 +82,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       allow(controller).to receive(:vote_params).and_return({})
       allow(book).to receive(:vote_up).and_return(nil)
 
-      expect(controller).to receive(:render_error).with(
-        "Failed to create vote",
-        :unprocessable_entity,
-      )
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
 
       controller.vote_up
     end
@@ -94,7 +91,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       failed_vote = double("vote", persisted?: false)
       allow(book).to receive(:vote_up).and_return(failed_vote)
 
-      expect(controller).to receive(:render_error).with("Failed to create vote", :unprocessable_entity)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
       controller.send(:vote_up)
     end
   end
@@ -126,7 +123,7 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "handles failed vote creation" do
       allow(book).to receive(:vote_down).and_return(nil)
 
-      expect(controller).to receive(:render_error).with("Failed to create vote", :unprocessable_entity)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
       controller.send(:vote_down)
     end
   end
@@ -150,10 +147,7 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "handles when no vote exists" do
       allow(book).to receive(:remove_vote).and_return(false)
 
-      expect(controller).to receive(:render_error).with(
-        "No vote found to remove",
-        :not_found,
-      )
+      expect(controller).to receive(:render_not_found).with(nil)
 
       controller.remove
     end
@@ -405,7 +399,8 @@ RSpec.describe Thumbsy::Api::VotesController do
                                                            votable_id: "999999",
                                                          })
 
-        expect { controller.send(:find_votable) }.to raise_error(ActiveRecord::RecordNotFound)
+        expect(controller).to receive(:render_error).with("Resource not found", :not_found)
+        controller.send(:find_votable)
       end
 
       it "finds valid votable successfully" do

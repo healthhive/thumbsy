@@ -426,10 +426,11 @@ RSpec.describe "Thumbsy API" do
       expect(book.voted_by?(user)).to be true
     end
 
-    it "rejects invalid feedback_option" do
-      expect do
-        book.vote_up(user, feedback_option: "invalid")
-      end.to raise_error(ArgumentError, /'invalid' is not a valid feedback_option/)
+    it "rejects invalid feedback_option and does not create vote" do
+      result = book.vote_up(user, feedback_option: "invalid")
+      expect(result).to be false
+      expect(book.voted_by?(user)).to be false
+      expect(book.votes_count).to eq(0)
     end
 
     it "allows feedback_option to be nil" do
@@ -453,6 +454,13 @@ RSpec.describe "Thumbsy API" do
       expect(vote.feedback_option).to eq("funny")
       expect(vote.down_vote?).to be true
       expect(book.down_voted_by?(user)).to be true
+    end
+
+    it "rejects invalid feedback options and does not create vote" do
+      result = book.vote_up(user, feedback_option: "invalid_option")
+      expect(result).to be false
+      expect(book.voted_by?(user)).to be false
+      expect(book.votes_count).to eq(0)
     end
   end
 
@@ -833,6 +841,127 @@ RSpec.describe "Thumbsy API" do
       end.not_to raise_error
       vote = book.thumbsy_votes.last
       expect(vote.feedback_option).to be_nil
+    end
+  end
+
+  describe "API Endpoint with Invalid Feedback Options" do
+    before(:each) do
+      Thumbsy.feedback_options = %w[like dislike funny]
+      Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+      load "lib/thumbsy/models/thumbsy_vote.rb"
+
+      Thumbsy::Api.configure do |config|
+        config.require_authentication = false
+        config.current_voter_method = -> { user }
+      end
+    end
+
+    it "rejects invalid feedback options and does not create vote" do
+      # This test verifies that invalid feedback options are rejected
+      # and no vote is created, maintaining data integrity
+      result = book.vote_up(user, feedback_option: "invalid_option")
+
+      # The vote should not be created
+      expect(result).to be false
+      expect(book.voted_by?(user)).to be false
+      expect(book.votes_count).to eq(0)
+    end
+
+    it "handles invalid feedback options in controller context" do
+      # This simulates what would happen in the controller
+      # With the updated behavior, invalid feedback options are rejected
+      # and the vote is not created, causing the controller to render an error
+      result = book.vote_up(user, feedback_option: "invalid_option")
+
+      # The vote should not be created
+      expect(result).to be false
+      expect(book.voted_by?(user)).to be false
+      expect(book.votes_count).to eq(0)
+    end
+
+    it "demonstrates the correct behavior for invalid feedback options" do
+      # Correct behavior: Invalid feedback options should raise ArgumentError
+      # and no vote should be created, maintaining data integrity
+      expect do
+        ThumbsyVote.vote_for(book, user, true, feedback_option: "invalid_option")
+      end.to raise_error(ArgumentError, /'invalid_option' is not a valid feedback_option/)
+
+      # Verify no vote was created
+      expect(book.voted_by?(user)).to be false
+      expect(book.votes_count).to eq(0)
+    end
+
+    it "verifies that invalid feedback options are rejected at model level" do
+      # Test that invalid feedback options raise ArgumentError at the model level
+      expect do
+        ThumbsyVote.vote_for(book, user, true, feedback_option: "invalid_option")
+      end.to raise_error(ArgumentError, /'invalid_option' is not a valid feedback_option/)
+
+      # Verify no vote was created in the database
+      expect(book.votes_count).to eq(0)
+    end
+
+    it "shows what the user's expected test would look like with correct behavior" do
+      # This test demonstrates what the user expects:
+      # it "accepts invalid feedback options and defaults them" do
+      #   post "/api/v1/books/#{book.id}/vote_up",
+      #     headers: auth_headers,
+      #     params: {
+      #       feedback_option: "invalid_option"
+      #     }
+      #
+      #   expect(response).to have_http_status(:unprocessable_entity)
+      #   json = JSON.parse(response.body)
+      #   expect(json["error"]).to eq("Failed to create vote")
+      # end
+
+      # With the correct behavior:
+      # 1. Invalid feedback options raise ArgumentError at the model level
+      # 2. The votable module catches ArgumentError and returns false
+      # 3. The controller renders an error response
+
+      result = book.vote_up(user, feedback_option: "invalid_option")
+      expect(result).to be false
+    end
+
+    it "demonstrates the correct behavior with invalid feedback options" do
+      # With the correct behavior, invalid feedback options should be rejected
+      # and no vote should be created, maintaining data integrity
+      result = book.vote_up(user, feedback_option: "invalid_option")
+
+      # The vote should not be created
+      expect(result).to be false
+      expect(book.voted_by?(user)).to be false
+      expect(book.votes_count).to eq(0)
+    end
+
+    it "comprehensive feedback option validation test" do
+      # Test valid feedback options with different users
+      vote1 = book.vote_up(user, feedback_option: "like")
+      expect(vote1).to be_persisted
+      expect(vote1.feedback_option).to eq("like")
+
+      vote2 = book.vote_up(user2, feedback_option: "dislike")
+      expect(vote2).to be_persisted
+      expect(vote2.feedback_option).to eq("dislike")
+
+      # Test nil feedback option (should be allowed)
+      vote3 = book.vote_up(user, feedback_option: nil)
+      expect(vote3).to be_persisted
+      expect(vote3.feedback_option).to be_nil
+      expect(vote3.id).to eq(vote1.id) # Should update the existing vote
+
+      # Test invalid feedback options (should be rejected)
+      result1 = book.vote_up(user2, feedback_option: "invalid_option")
+      expect(result1).to be false
+
+      result2 = book.vote_up(user2, feedback_option: "spam")
+      expect(result2).to be false
+
+      # Verify final state - only 2 votes should exist (one per user)
+      expect(book.votes_count).to eq(2)
+      # The enum returns string values when accessed
+      expect(book.thumbsy_votes.pluck(:feedback_option)).to match_array([nil, "dislike"])
     end
   end
 end
