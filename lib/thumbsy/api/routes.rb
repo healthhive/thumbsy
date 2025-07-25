@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-Thumbsy::Engine.routes.draw do
+Thumbsy::Api::Engine.routes.draw do
   # Flexible routes that can be mounted anywhere
   scope ":votable_type/:votable_id" do
     post "votes/vote_up", to: "votes#vote_up"
