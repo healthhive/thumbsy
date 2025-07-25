@@ -16,6 +16,10 @@ module Thumbsy
   def self.configure
     self.config ||= Configuration.new
     yield(config)
+    # Ensure feedback_options validation is set up after configuration
+    return unless defined?(ThumbsyVote) && config.feedback_options.present?
+
+    ThumbsyVote.setup_feedback_options_validation!
   end
 
   def self.feedback_options

@@ -2,10 +2,9 @@
 
 module Thumbsy
   class Configuration
-    attr_accessor :feedback_options, :api_config
+    attr_accessor :api_config
 
     def initialize
-      @feedback_options = nil
       @api_config = Thumbsy::Api::Configuration.new
     end
 
@@ -13,5 +12,13 @@ module Thumbsy
       yield @api_config if block_given?
       @api_config
     end
+
+    def feedback_options=(options)
+      @feedback_options = options
+      # Automatically set up validation if ThumbsyVote is loaded
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
+    end
+
+    attr_reader :feedback_options
   end
 end

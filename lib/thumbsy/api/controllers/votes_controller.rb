@@ -9,24 +9,24 @@ module Thumbsy
       # POST /votes/vote_up
       def vote_up
         vote = @votable.vote_up(current_voter, comment: vote_params[:comment],
-                                               feedback_option: vote_params[:feedback_option])
+                                               feedback_options: vote_params[:feedback_options])
 
-        if vote && vote.persisted?
+        if vote&.persisted? && vote.errors.empty?
           render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json, :created)
         else
-          render_unprocessable_entity("Failed to create vote")
+          render_unprocessable_entity("Failed to create vote", vote&.errors&.full_messages || [])
         end
       end
 
       # POST /votes/vote_down
       def vote_down
         vote = @votable.vote_down(current_voter, comment: vote_params[:comment],
-                                                 feedback_option: vote_params[:feedback_option])
+                                                 feedback_options: vote_params[:feedback_options])
 
-        if vote && vote.persisted?
+        if vote&.persisted? && vote.errors.empty?
           render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json, :created)
         else
-          render_unprocessable_entity("Failed to create vote")
+          render_unprocessable_entity("Failed to create vote", vote&.errors&.full_messages || [])
         end
       end
 
@@ -113,7 +113,12 @@ module Thumbsy
       end
 
       def vote_params
-        params.permit(:comment, :feedback_option, :votable_type, :votable_id)
+        permitted = params.permit(:comment, { feedback_options: [] }, :feedback_option, :votable_type, :votable_id)
+        # Normalize feedback_option (string) to feedback_options (array)
+        if permitted[:feedback_options].blank? && permitted[:feedback_option].present?
+          permitted[:feedback_options] = [permitted.delete(:feedback_option)]
+        end
+        permitted
       end
     end
   end

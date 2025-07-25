@@ -20,6 +20,13 @@ class NonVoterItem < ActiveRecord::Base
 end
 
 RSpec.describe "Thumbsy Module Edge Cases" do
+  before(:each) do
+    Thumbsy.feedback_options = %w[like dislike funny]
+    Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+    load "lib/thumbsy/models/thumbsy_vote.rb"
+    ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
+  end
+
   let(:user) { User.create!(name: "Test User") }
   let(:user2) { User.create!(name: "Test User 2") }
   let(:book) { Book.create!(title: "Test Book") }
@@ -51,11 +58,11 @@ RSpec.describe "Thumbsy Module Edge Cases" do
         expect(book.vote_up(voter_without_association)).to be false
       end
 
-      it "handles ActiveRecord::RecordInvalid exceptions" do
-        # Mock ThumbsyVote.vote_for to raise an exception
-        allow(ThumbsyVote).to receive(:vote_for).and_raise(ActiveRecord::RecordInvalid.new(ThumbsyVote.new))
-
-        expect(book.vote_up(user)).to be false
+      it "vote_up method handles ActiveRecord::RecordInvalid exceptions" do
+        result = book.vote_up(user, feedback_options: ["invalid_option"])
+        expect(result).to be_a(ThumbsyVote)
+        expect(result).not_to be_persisted
+        expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
       end
 
       it "handles very long comments" do
@@ -89,10 +96,11 @@ RSpec.describe "Thumbsy Module Edge Cases" do
         expect { book.vote_down(non_voter) }.to raise_error(ArgumentError, "Voter is invalid")
       end
 
-      it "handles ActiveRecord::RecordInvalid exceptions" do
-        allow(ThumbsyVote).to receive(:vote_for).and_raise(ActiveRecord::RecordInvalid.new(ThumbsyVote.new))
-
-        expect(book.vote_down(user)).to be false
+      it "vote_down method handles ActiveRecord::RecordInvalid exceptions" do
+        result = book.vote_down(user, feedback_options: ["invalid_option"])
+        expect(result).to be_a(ThumbsyVote)
+        expect(result).not_to be_persisted
+        expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
       end
     end
 

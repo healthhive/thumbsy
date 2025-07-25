@@ -79,8 +79,8 @@ module Thumbsy::Votable
   end
 
   # Core voting methods
-  def vote_up(voter, comment: nil, feedback_option: nil)
-  def vote_down(voter, comment: nil, feedback_option: nil)
+  def vote_up(voter, comment: nil, feedback_options: nil)
+  def vote_down(voter, comment: nil, feedback_options: nil)
   def remove_vote(voter)
 
   # Query methods
@@ -160,12 +160,6 @@ class ThumbsyVote < ActiveRecord::Base
   validates :vote, inclusion: { in: [true, false] }
   validates :voter_id, uniqueness: { scope: %i[voter_type votable_type votable_id] }
 
-  FEEDBACK_OPTIONS = ['like', 'dislike', 'funny'].freeze
-
-  enum :feedback_option, FEEDBACK_OPTIONS.each_with_index.to_h
-
-  validates :feedback_option, inclusion: { in: FEEDBACK_OPTIONS }, allow_nil: true
-
   scope :up_votes, -> { where(vote: true) }
   scope :down_votes, -> { where(vote: false) }
   scope :with_comments, -> { where.not(comment: [nil, ""]) }
@@ -178,7 +172,7 @@ class ThumbsyVote < ActiveRecord::Base
     vote == false
   end
 
-  def self.vote_for(votable, voter, vote_value, comment: nil, feedback_option: nil)
+  def self.vote_for(votable, voter, vote_value, comment: nil, feedback_options: nil)
     raise ArgumentError, "Voter cannot be nil" if voter.nil?
     raise ArgumentError, "Votable cannot be nil" if votable.nil?
 
@@ -191,7 +185,7 @@ class ThumbsyVote < ActiveRecord::Base
       existing_vote.update!(
         vote: vote_value,
         comment: comment,
-        feedback_option: feedback_option
+        feedback_options: feedback_options
       )
       existing_vote
     else
@@ -200,7 +194,7 @@ class ThumbsyVote < ActiveRecord::Base
         voter: voter,
         vote: vote_value,
         comment: comment,
-        feedback_option: feedback_option
+        feedback_options: feedback_options
       )
     end
   end
@@ -212,7 +206,7 @@ end
 - **Model provided by gem**: The ThumbsyVote model is provided directly by the gem and is not generated from a template
 - **Polymorphic design**: Allows maximum flexibility
 - **Boolean vote field**: Simple true/false for up/down votes
-- **Feedback options**: Customizable enum for additional vote metadata
+- **Feedback options**: Customizable feedback_options for additional vote metadata
 - **Centralized logic**: `vote_for` class method handles all vote creation/updates
 - **Proper validation**: Unique constraint prevents duplicate votes
 - **Error handling**: Raises ArgumentError for nil voters/votables
@@ -231,10 +225,10 @@ The `Thumbsy::Generators::InstallGenerator` sets up the core voting functionalit
 #### Usage
 
 ```bash
-# Default (UUID primary keys, default feedback options)
+# Default (UUID primary keys, default feedback_options)
 rails generate thumbsy:install
 
-# Custom feedback options
+# Custom feedback_options
 rails generate thumbsy:install --feedback=helpful,unhelpful,spam
 
 # Custom ID type (bigint or integer)
@@ -246,13 +240,13 @@ rails generate thumbsy:install --id_type=bigint --feedback=helpful,unhelpful,spa
 
 #### Options
 
-- `--feedback=option1,option2,...`  Set custom feedback options (default: like, dislike, funny)
+- `--feedback=option1,option2,...`  Set custom feedback_options (default: like, dislike, funny)
 - `--id_type=uuid|bigint|integer`   Set primary key type for the votes table (default: uuid)
 
 #### Notes
 
 - The initializer is always generated as `config/initializers/thumbsy.rb` and contains all configuration (core and API).
-- The migration template uses ERB to inject the selected `id_type` and feedback options.
+- The migration template uses ERB to inject the selected `id_type` and feedback_options.
 - No model file is generated in your app; the gem-provided model is always used.
 
 ## Optional API Architecture
@@ -283,12 +277,12 @@ class Thumbsy::Api::VotesController < Thumbsy::Api::ApplicationController
   before_action :find_votable
 
   def vote_up
-    @vote = @votable.vote_up(current_voter, comment: vote_params[:comment], feedback_option: vote_params[:feedback_option])
+    @vote = @votable.vote_up(current_voter, comment: vote_params[:comment], feedback_options: vote_params[:feedback_options])
     render json: success_response(@vote), status: :created
   end
 
   def vote_down
-    @vote = @votable.vote_down(current_voter, comment: vote_params[:comment], feedback_option: vote_params[:feedback_option])
+    @vote = @votable.vote_down(current_voter, comment: vote_params[:comment], feedback_options: vote_params[:feedback_options])
     render json: success_response(@vote), status: :created
   end
 
@@ -372,7 +366,7 @@ class CreateThumbsyVotes < ActiveRecord::Migration[7.0]
       t.references :voter, null: false, type: :uuid, polymorphic: true, index: false
       t.boolean :vote, null: false, default: false
       t.text :comment
-      t.integer :feedback_option # Only present if feedback_options are configured
+      t.string :feedback_options, array: true, default: [] # Only present if feedback_options are configured (PostgreSQL syntax)
       t.timestamps null: false
     end
 
@@ -395,7 +389,7 @@ CREATE TABLE thumbsy_votes (
   votable_id uuid NOT NULL,
   vote boolean NOT NULL DEFAULT false,
   comment text,
-  feedback_option integer,
+  feedback_options varchar(255)[] DEFAULT '{}', -- Array of strings for PostgreSQL. Use text for other DBs.
   created_at timestamp NOT NULL,
   updated_at timestamp NOT NULL
 );
@@ -413,7 +407,7 @@ CREATE INDEX index_thumbsy_votes_on_voter_type_voter_id_vote
 
 1. **Polymorphic Design**: `voter_type/voter_id` and `votable_type/votable_id` allow any model to participate
 2. **Boolean Vote Field**: Simple `vote` boolean field for up/down votes
-3. **Feedback Options**: Integer enum field for additional vote metadata
+3. **Feedback Options**: Array of strings (PostgreSQL) or text (other DBs) for additional vote metadata
 4. **Composite Indexes**: Optimize queries for both voter and votable lookups
 5. **Unique Constraint**: Prevents duplicate votes at database level
 6. **Optional Comments**: Text field for vote explanations
@@ -483,9 +477,9 @@ RSpec.describe Thumbsy do
       expect { book.vote_up(user) }.not_to change { book.votes_count }
     end
 
-    it 'handles feedback options' do
-      vote = book.vote_up(user, feedback_option: 'like')
-      expect(vote.feedback_option).to eq('like')
+    it 'handles feedback_options' do
+      vote = book.vote_up(user, feedback_options: ["like"])
+      expect(vote.feedback_options).to eq(["like"])
     end
   end
 end
@@ -498,9 +492,11 @@ end
 RSpec.describe "Thumbsy API" do
   describe "POST /books/1/vote_up" do
     it "creates a vote via API" do
-      post "/books/#{book.id}/vote_up", params: { comment: "Great book!", feedback_option: "like" }
+      post "/books/#{book.id}/vote_up", params: { comment: "Great book!", feedback_options: ["like"] }
       expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)["data"]["feedback_option"]).to eq("like")
+      expect(JSON.parse(response.body)["data"]["feedback_options"]).to eq(["like"])
     end
   end
 end
+
+```

@@ -637,25 +637,28 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       Thumbsy.feedback_options = %w[like dislike funny]
       Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
     end
 
     it "accepts valid feedback_option values" do
       Thumbsy.feedback_options.each do |option|
         vote = ThumbsyVote.new(votable: book, voter: user, vote: true)
-        vote.feedback_option = option
+        vote.feedback_options = [option]
         expect(vote).to be_valid, "expected '#{option}' to be valid"
       end
     end
 
     it "allows feedback_option to be nil" do
       vote = ThumbsyVote.new(votable: book, voter: user, vote: true)
-      vote.feedback_option = nil
+      vote.feedback_options = nil
       expect(vote).to be_valid
+      expect(vote.feedback_options).to be_empty
     end
 
-    it "rejects invalid feedback_option values" do
-      vote = ThumbsyVote.new(votable: book, voter: user, vote: true)
-      expect { vote.feedback_option = "invalid_option" }.to raise_error(ArgumentError)
+    it "rejects invalid feedback_options" do
+      expect do
+        ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_options: ["invalid_option"]).save!
+      end.to raise_error(ActiveRecord::RecordInvalid, /Feedback options contains invalid feedback option/)
     end
   end
 
@@ -680,12 +683,12 @@ RSpec.describe "Thumbsy Comprehensive Functionality" do
       expect(ThumbsyVote.validators.map(&:attributes).flatten).not_to include(:feedback_option)
     end
 
-    it "defines feedback_option enum and validation when feedback_options is set" do
+    it "defines feedback_options validation when feedback_options is set" do
       Thumbsy.feedback_options = %w[helpful unhelpful spam]
       Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
-      expect(ThumbsyVote.respond_to?(:feedback_options)).to be true
-      expect(ThumbsyVote.validators.map(&:attributes).flatten).to include(:feedback_option)
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
+      expect(ThumbsyVote.validators.map(&:attributes).flatten).to include(:feedback_options)
     end
   end
 

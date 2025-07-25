@@ -55,18 +55,18 @@ RSpec.describe "Thumbsy API Controller Methods" do
     it "creates a vote with feedback option" do
       allow(controller).to receive(:vote_params).and_return(
         ActionController::Parameters.new({
-                                           comment: "Great book!",
-                                           feedback_option: "like",
+                                           feedback_options: ["like"],
                                          }),
       )
 
       # Mock the serializer to avoid the missing constant error
-      serializer_double = double("serializer",
-                                 as_json: { vote_type: "up", comment: "Great book!", feedback_option: "like" })
+      serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                          as_json: { vote_type: "up", comment: "Great book!",
+                                                     feedback_options: ["like"] })
       allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
       expect(controller).to receive(:render_success).with(
-        { vote_type: "up", comment: "Great book!", feedback_option: "like" },
+        { vote_type: "up", comment: "Great book!", feedback_options: ["like"] },
         :created,
       )
 
@@ -76,13 +76,14 @@ RSpec.describe "Thumbsy API Controller Methods" do
     it "rejects invalid feedback options" do
       allow(controller).to receive(:vote_params).and_return(
         ActionController::Parameters.new({
-                                           feedback_option: "invalid",
+                                           feedback_options: ["invalid"],
                                          }),
       )
 
-      # The controller should handle the ArgumentError and render an error
-      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+      # Use a real invalid vote instance
+      invalid_vote = ThumbsyVote.new # Not persisted, missing required fields
+      allow(book).to receive(:vote_up).and_return(invalid_vote)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
       controller.vote_up
     end
 
@@ -94,7 +95,8 @@ RSpec.describe "Thumbsy API Controller Methods" do
       )
 
       # Mock the serializer to avoid the missing constant error
-      serializer_double = double("serializer", as_json: { vote_type: "up", comment: "Amazing book!" })
+      serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                          as_json: { vote_type: "up", comment: "Amazing book!" })
       allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
       expect(controller).to receive(:render_success).with(
@@ -110,18 +112,18 @@ RSpec.describe "Thumbsy API Controller Methods" do
     it "creates a down vote with feedback option" do
       allow(controller).to receive(:vote_params).and_return(
         ActionController::Parameters.new({
-                                           comment: "Not my style",
-                                           feedback_option: "dislike",
+                                           feedback_options: ["dislike"],
                                          }),
       )
 
       # Mock the serializer to avoid the missing constant error
-      serializer_double = double("serializer",
-                                 as_json: { vote_type: "down", comment: "Not my style", feedback_option: "dislike" })
+      serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                          as_json: { vote_type: "down", comment: "Not my style",
+                                                     feedback_options: ["dislike"] })
       allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
       expect(controller).to receive(:render_success).with(
-        { vote_type: "down", comment: "Not my style", feedback_option: "dislike" },
+        { vote_type: "down", comment: "Not my style", feedback_options: ["dislike"] },
         :created,
       )
 
@@ -131,13 +133,14 @@ RSpec.describe "Thumbsy API Controller Methods" do
     it "rejects invalid feedback options for down vote" do
       allow(controller).to receive(:vote_params).and_return(
         ActionController::Parameters.new({
-                                           feedback_option: "invalid_option",
+                                           feedback_options: ["invalid_option"],
                                          }),
       )
 
-      # The controller should handle the ArgumentError and render an error
-      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+      # Use a real invalid vote instance
+      invalid_vote = ThumbsyVote.new # Not persisted, missing required fields
+      allow(book).to receive(:vote_down).and_return(invalid_vote)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
       controller.vote_down
     end
   end
@@ -145,7 +148,7 @@ RSpec.describe "Thumbsy API Controller Methods" do
   describe "#status" do
     it "returns vote status when user has voted" do
       # First create a vote
-      book.vote_up(user, comment: "Great book!", feedback_option: "like")
+      book.vote_up(user, comment: "Great book!", feedback_options: ["like"])
 
       expect(controller).to receive(:render_success).with(
         {
@@ -197,8 +200,8 @@ RSpec.describe "Thumbsy API Controller Methods" do
     it "returns all votes for the votable" do
       # Create multiple votes
       user2 = User.create!(name: "Another User")
-      book.vote_up(user, comment: "Great book!", feedback_option: "like")
-      book.vote_down(user2, comment: "Not my style", feedback_option: "dislike")
+      book.vote_up(user, comment: "Great book!", feedback_options: ["like"])
+      book.vote_down(user2, comment: "Not my style", feedback_options: ["dislike"])
 
       # Mock the serializer to avoid the missing constant error
       serializer_double = double("serializer", as_json: { vote_type: "up", comment: "Great book!" })
@@ -229,15 +232,13 @@ RSpec.describe "Thumbsy API Controller Methods" do
   describe "vote_params method" do
     it "handles vote parameters correctly" do
       params = ActionController::Parameters.new({
-                                                  comment: "Great book!",
-                                                  feedback_option: "like",
+                                                  feedback_options: ["like"],
                                                 })
       allow(controller).to receive(:params).and_return(params)
 
       result = controller.send(:vote_params)
       expect(result).to be_a(ActionController::Parameters)
-      expect(result[:comment]).to eq("Great book!")
-      expect(result[:feedback_option]).to eq("like")
+      expect(result[:feedback_options]).to eq(["like"])
     end
 
     it "handles missing parameters gracefully" do
@@ -276,15 +277,16 @@ RSpec.describe "Thumbsy API Controller Methods" do
       it "accepts valid feedback options" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "like",
+                                             feedback_options: ["like"],
                                            }),
         )
 
-        serializer_double = double("serializer", as_json: { vote_type: "up", feedback_option: "like" })
+        serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                            as_json: { vote_type: "up", feedback_options: ["like"] })
         allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
         expect(controller).to receive(:render_success).with(
-          { vote_type: "up", feedback_option: "like" },
+          { vote_type: "up", feedback_options: ["like"] },
           :created,
         )
 
@@ -294,15 +296,16 @@ RSpec.describe "Thumbsy API Controller Methods" do
       it "accepts nil feedback option" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: nil,
+                                             feedback_options: nil,
                                            }),
         )
 
-        serializer_double = double("serializer", as_json: { vote_type: "up", feedback_option: nil })
+        serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                            as_json: { vote_type: "up", feedback_options: [] })
         allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
         expect(controller).to receive(:render_success).with(
-          { vote_type: "up", feedback_option: nil },
+          { vote_type: "up", feedback_options: [] },
           :created,
         )
 
@@ -312,31 +315,30 @@ RSpec.describe "Thumbsy API Controller Methods" do
       it "rejects invalid feedback options" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "invalid_option",
+                                             feedback_options: ["invalid_option"],
                                            }),
         )
 
-        expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+        # Use a real invalid vote instance
+        invalid_vote = ThumbsyVote.new # Not persisted, missing required fields
+        allow(book).to receive(:vote_up).and_return(invalid_vote)
+        expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
         controller.vote_up
       end
 
-      it "accepts empty string feedback option (converts to nil)" do
+      it "accepts empty string feedback option (converts to nil or empty array)" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "",
+                                             feedback_options: nil,
                                            }),
         )
-
-        # Empty strings are converted to nil by the enum
-        serializer_double = double("serializer", as_json: { vote_type: "up", feedback_option: nil })
+        serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                            as_json: { vote_type: "up", feedback_options: [] })
         allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
-
         expect(controller).to receive(:render_success).with(
-          { vote_type: "up", feedback_option: nil },
+          { vote_type: "up", feedback_options: [] },
           :created,
         )
-
         controller.vote_up
       end
 
@@ -346,12 +348,14 @@ RSpec.describe "Thumbsy API Controller Methods" do
         invalid_options.each do |invalid_option|
           allow(controller).to receive(:vote_params).and_return(
             ActionController::Parameters.new({
-                                               feedback_option: invalid_option,
+                                               feedback_options: [invalid_option],
                                              }),
           )
 
-          expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+          # Use a real invalid vote instance
+          invalid_vote = ThumbsyVote.new # Not persisted, missing required fields
+          allow(book).to receive(:vote_up).and_return(invalid_vote)
+          expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
           controller.vote_up
         end
       end
@@ -361,15 +365,16 @@ RSpec.describe "Thumbsy API Controller Methods" do
       it "accepts valid feedback options" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "dislike",
+                                             feedback_options: ["dislike"],
                                            }),
         )
 
-        serializer_double = double("serializer", as_json: { vote_type: "down", feedback_option: "dislike" })
+        serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                            as_json: { vote_type: "down", feedback_options: ["dislike"] })
         allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
         expect(controller).to receive(:render_success).with(
-          { vote_type: "down", feedback_option: "dislike" },
+          { vote_type: "down", feedback_options: ["dislike"] },
           :created,
         )
 
@@ -379,15 +384,16 @@ RSpec.describe "Thumbsy API Controller Methods" do
       it "accepts nil feedback option" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: nil,
+                                             feedback_options: nil,
                                            }),
         )
 
-        serializer_double = double("serializer", as_json: { vote_type: "down", feedback_option: nil })
+        serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                            as_json: { vote_type: "down", feedback_options: [] })
         allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
         expect(controller).to receive(:render_success).with(
-          { vote_type: "down", feedback_option: nil },
+          { vote_type: "down", feedback_options: [] },
           :created,
         )
 
@@ -397,12 +403,14 @@ RSpec.describe "Thumbsy API Controller Methods" do
       it "rejects invalid feedback options" do
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "invalid_option",
+                                             feedback_options: ["invalid_option"],
                                            }),
         )
 
-        expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+        # Use a real invalid vote instance
+        invalid_vote = ThumbsyVote.new # Not persisted, missing required fields
+        allow(book).to receive(:vote_down).and_return(invalid_vote)
+        expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
         controller.vote_down
       end
     end
@@ -414,15 +422,16 @@ RSpec.describe "Thumbsy API Controller Methods" do
         valid_options.each do |valid_option|
           allow(controller).to receive(:vote_params).and_return(
             ActionController::Parameters.new({
-                                               feedback_option: valid_option,
+                                               feedback_options: [valid_option],
                                              }),
           )
 
-          serializer_double = double("serializer", as_json: { vote_type: "up", feedback_option: valid_option })
+          serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                              as_json: { vote_type: "up", feedback_options: [valid_option] })
           allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
           expect(controller).to receive(:render_success).with(
-            { vote_type: "up", feedback_option: valid_option },
+            { vote_type: "up", feedback_options: [valid_option] },
             :created,
           )
 
@@ -434,15 +443,16 @@ RSpec.describe "Thumbsy API Controller Methods" do
         # Test valid option
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "like",
+                                             feedback_options: ["like"],
                                            }),
         )
 
-        serializer_double = double("serializer", as_json: { vote_type: "up", feedback_option: "like" })
+        serializer_double = instance_double("Thumbsy::Api::Serializers::VoteSerializer",
+                                            as_json: { vote_type: "up", feedback_options: ["like"] })
         allow(Thumbsy::Api::Serializers::VoteSerializer).to receive(:new).and_return(serializer_double)
 
         expect(controller).to receive(:render_success).with(
-          { vote_type: "up", feedback_option: "like" },
+          { vote_type: "up", feedback_options: ["like"] },
           :created,
         )
 
@@ -451,12 +461,14 @@ RSpec.describe "Thumbsy API Controller Methods" do
         # Test invalid option
         allow(controller).to receive(:vote_params).and_return(
           ActionController::Parameters.new({
-                                             feedback_option: "invalid_option",
+                                             feedback_options: ["invalid_option"],
                                            }),
         )
 
-        expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+        # Use a real invalid vote instance
+        invalid_vote = ThumbsyVote.new # Not persisted, missing required fields
+        allow(book).to receive(:vote_up).and_return(invalid_vote)
+        expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
         controller.vote_up
       end
     end

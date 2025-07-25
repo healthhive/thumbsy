@@ -36,7 +36,7 @@ RSpec.describe Thumbsy::Api::Serializers::VoteSerializer do
 
   let!(:user) { SerializerTestUser.create!(name: "Serializer User") }
   let!(:book) { SerializerTestBook.create!(title: "Serializer Book") }
-  let(:vote) { book.vote_up(user, comment: "Test vote", feedback_option: "like") }
+  let(:vote) { book.vote_up(user, comment: "Test vote", feedback_options: ["like"]) }
   let(:serializer) { described_class.new(vote) }
 
   describe "#as_json" do
@@ -47,7 +47,7 @@ RSpec.describe Thumbsy::Api::Serializers::VoteSerializer do
         id: vote.id,
         vote_type: "up",
         comment: "Test vote",
-        feedback_option: "like",
+        feedback_options: ["like"],
       )
 
       # Verify timestamps are NOT included
@@ -78,18 +78,18 @@ RSpec.describe Thumbsy::Api::Serializers::VoteSerializer do
     end
 
     it "handles down votes correctly" do
-      down_vote = book.vote_down(user, comment: "Down vote", feedback_option: "dislike")
+      down_vote = book.vote_down(user, comment: "Down vote", feedback_options: ["dislike"])
       serializer = described_class.new(down_vote)
       result = serializer.as_json
 
       expect(result).to include(
         vote_type: "down",
         comment: "Down vote",
-        feedback_option: "dislike",
+        feedback_options: ["dislike"],
       )
     end
 
-    it "handles votes without comment and feedback_option" do
+    it "handles votes without comment and feedback_options" do
       vote_without_optional = book.vote_up(user)
       serializer = described_class.new(vote_without_optional)
 
@@ -98,7 +98,7 @@ RSpec.describe Thumbsy::Api::Serializers::VoteSerializer do
       expect(result).to include(
         vote_type: "up",
         comment: nil,
-        feedback_option: nil,
+        feedback_options: [],
       )
     end
   end

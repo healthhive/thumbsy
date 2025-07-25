@@ -69,7 +69,7 @@ GET /books/1/votes
 
 ## API Configuration
 
-Configure the API and feedback options in `config/initializers/thumbsy.rb` (centralized initializer):
+Configure the API and feedback_options in `config/initializers/thumbsy.rb` (centralized initializer):
 
 ```ruby
 Thumbsy.configure do |config|
@@ -172,19 +172,19 @@ end
 ```json
 {
   "comment": "Great book!",
-  "feedback_option": "like"
+  "feedback_options": ["like"]
 }
 ```
 
 **Parameters:**
 - `comment` (optional): Text comment explaining the vote
-- `feedback_option` (optional): One of the configured feedback options (e.g., "like", "dislike", "funny")
+- `feedback_options` (optional): One of the configured feedback_options (e.g., "like", "dislike", "funny")
 
 ## Feedback Options
 
-- `feedback_option` is always a string key (e.g., "like", "dislike").
-- The API and serializer will always return the string value for feedback_option.
-- Invalid feedback options will result in a validation error.
+- `feedback_options` is always a string key (e.g., "like", "dislike").
+- The API and serializer will always return the string value for feedback_options.
+- Invalid feedback_options will result in a validation error.
 
 ## API Responses
 
@@ -196,7 +196,7 @@ end
     "id": 123,
     "vote": true,
     "comment": "Great book!",
-    "feedback_option": "like",
+    "feedback_options": ["like"],
     "voter": {
       "id": 456,
       "name": "John Doe",
@@ -216,7 +216,7 @@ end
     "voted": true,
     "vote_type": "up",
     "comment": "Great book!",
-    "feedback_option": "like",
+    "feedback_options": ["like"],
     "vote_counts": {
       "total": 5,
       "up": 4,
@@ -241,7 +241,7 @@ end
 ```json
 {
   "message": "Validation failed",
-  "errors": ["'invalid_option' is not a valid feedback_option"]
+  "errors": ["'invalid_option' is not a valid feedback_options"]
 }
 ```
 
@@ -257,7 +257,7 @@ end
 
 ```javascript
 // Vote up with comment and feedback
-const voteUp = async (votableType, votableId, comment, feedbackOption) => {
+const voteUp = async (votableType, votableId, comment, feedbackOptions) => {
   const response = await fetch(`/api/v1/${votableType}/${votableId}/vote_up`, {
     method: 'POST',
     headers: {
@@ -266,7 +266,7 @@ const voteUp = async (votableType, votableId, comment, feedbackOption) => {
     },
     body: JSON.stringify({
       comment: comment,
-      feedback_option: feedbackOption
+      feedback_options: feedbackOptions
     })
   });
 
@@ -307,9 +307,9 @@ const useVote = (votableType, votableId) => {
     }
   };
 
-  const voteUp = async (comment, feedbackOption) => {
+  const voteUp = async (comment, feedbackOptions) => {
     try {
-      const data = await voteUp(votableType, votableId, comment, feedbackOption);
+      const data = await voteUp(votableType, votableId, comment, feedbackOptions);
       await fetchVoteStatus(); // Refresh status
       return data;
     } catch (error) {
@@ -318,9 +318,9 @@ const useVote = (votableType, votableId) => {
     }
   };
 
-  const voteDown = async (comment, feedbackOption) => {
+  const voteDown = async (comment, feedbackOptions) => {
     try {
-      const data = await voteDown(votableType, votableId, comment, feedbackOption);
+      const data = await voteDown(votableType, votableId, comment, feedbackOptions);
       await fetchVoteStatus(); // Refresh status
       return data;
     } catch (error) {
@@ -374,9 +374,9 @@ export function useVote(votableType, votableId) {
     }
   };
 
-  const voteUp = async (comment, feedbackOption) => {
+  const voteUp = async (comment, feedbackOptions) => {
     try {
-      const data = await voteUp(votableType, votableId, comment, feedbackOption);
+      const data = await voteUp(votableType, votableId, comment, feedbackOptions);
       await fetchVoteStatus();
       return data;
     } catch (error) {
@@ -446,7 +446,7 @@ The Thumbsy API provides convenient helper methods for common HTTP status codes:
    ```json
    {
      "message": "Validation failed",
-     "errors": ["'invalid_option' is not a valid feedback_option"]
+     "errors": ["'invalid_option' is not a valid feedback_options"]
    }
    ```
 
@@ -477,15 +477,15 @@ The Thumbsy API provides convenient helper methods for common HTTP status codes:
 ### Error Handling in Frontend
 
 ```javascript
-const handleVote = async (action, comment, feedbackOption) => {
+const handleVote = async (action, comment, feedbackOptions) => {
   try {
     setLoading(true);
 
     let response;
     if (action === 'up') {
-      response = await voteUp(comment, feedbackOption);
+      response = await voteUp(comment, feedbackOptions);
     } else if (action === 'down') {
-      response = await voteDown(comment, feedbackOption);
+      response = await voteDown(comment, feedbackOptions);
     } else if (action === 'remove') {
       response = await removeVote();
     }
@@ -531,7 +531,7 @@ const handleVote = async (action, comment, feedbackOption) => {
 
 ### Input Validation
 
-- Validate feedback options against allowed values
+- Validate feedback_options against allowed values
 - Sanitize comment text
 - Rate limiting for vote submissions
 
@@ -559,21 +559,21 @@ RSpec.describe "Thumbsy API" do
   end
 
   describe "POST /books/:id/vote_up" do
-    it "creates a vote with feedback option" do
+    it "creates a vote with feedback_options" do
       post "/books/#{book.id}/vote_up", params: {
         comment: "Great book!",
-        feedback_option: "like"
+        feedback_options: ["like"]
       }
 
       expect(response).to have_http_status(:created)
       json = JSON.parse(response.body)
-      expect(json["data"]["feedback_option"]).to eq("like")
+      expect(json["data"]["feedback_options"]).to eq(["like"])
       expect(json["data"]["comment"]).to eq("Great book!")
     end
 
-    it "rejects invalid feedback options" do
+    it "rejects invalid feedback_options" do
       post "/books/#{book.id}/vote_up", params: {
-        feedback_option: "invalid"
+        feedback_options: ["invalid"]
       }
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -607,7 +607,7 @@ class Api::V1::CustomVotesController < Thumbsy::Api::ApplicationController
       begin
         vote = @votable.vote_up(current_voter,
                                comment: vote_data[:comment],
-                               feedback_option: vote_data[:feedback_option])
+                               feedback_options: vote_data[:feedback_options])
 
         if vote && vote.persisted?
           results << { id: vote.id, status: "created" }

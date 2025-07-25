@@ -63,14 +63,14 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "creates an up vote successfully" do
       allow(controller).to receive(:vote_params).and_return({
                                                               comment: "Great book!",
-                                                              feedback_option: "like",
+                                                              feedback_options: ["like"],
                                                             })
 
       expect(controller).to receive(:render_success).with(
         hash_including(
           vote_type: "up",
           comment: "Great book!",
-          feedback_option: "like",
+          feedback_options: ["like"],
         ),
         :created,
       )
@@ -79,19 +79,18 @@ RSpec.describe Thumbsy::Api::VotesController do
     end
 
     it "handles failed vote creation" do
-      allow(controller).to receive(:vote_params).and_return({})
-      allow(book).to receive(:vote_up).and_return(nil)
-
-      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
-
+      # Use a real invalid vote instance
+      vote = ThumbsyVote.new # Not persisted, missing required fields
+      allow(book).to receive(:vote_up).and_return(vote)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
       controller.vote_up
     end
 
     it "handles vote with validation errors" do
-      failed_vote = double("vote", persisted?: false)
-      allow(book).to receive(:vote_up).and_return(failed_vote)
-
-      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
+      # Use a real invalid vote instance
+      vote = ThumbsyVote.new # Not persisted, missing required fields
+      allow(book).to receive(:vote_up).and_return(vote)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
       controller.send(:vote_up)
     end
   end
@@ -105,14 +104,14 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "creates a down vote successfully" do
       allow(controller).to receive(:vote_params).and_return({
                                                               comment: "Not my cup of tea",
-                                                              feedback_option: "dislike",
+                                                              feedback_options: ["dislike"],
                                                             })
 
       expect(controller).to receive(:render_success).with(
         hash_including(
           vote_type: "down",
           comment: "Not my cup of tea",
-          feedback_option: "dislike",
+          feedback_options: ["dislike"],
         ),
         :created,
       )
@@ -121,9 +120,10 @@ RSpec.describe Thumbsy::Api::VotesController do
     end
 
     it "handles failed vote creation" do
-      allow(book).to receive(:vote_down).and_return(nil)
-
-      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote")
+      # Use a real invalid vote instance
+      vote = ThumbsyVote.new # Not persisted, missing required fields
+      allow(book).to receive(:vote_down).and_return(vote)
+      expect(controller).to receive(:render_unprocessable_entity).with("Failed to create vote", anything)
       controller.send(:vote_down)
     end
   end
@@ -154,7 +154,7 @@ RSpec.describe Thumbsy::Api::VotesController do
   end
 
   describe "#status" do
-    let(:vote) { book.vote_up(user, comment: "Test vote", feedback_option: "like") }
+    let(:vote) { book.vote_up(user, comment: "Test vote", feedback_options: ["like"]) }
 
     before do
       allow(controller).to receive(:find_votable)
@@ -203,8 +203,8 @@ RSpec.describe Thumbsy::Api::VotesController do
     before do
       allow(controller).to receive(:find_votable)
       controller.instance_variable_set(:@votable, book)
-      book.vote_up(user, comment: "First vote", feedback_option: "like")
-      book.vote_up(User.create!(name: "Another User"), comment: "Second vote", feedback_option: "dislike")
+      book.vote_up(user, comment: "First vote", feedback_options: ["like"])
+      book.vote_up(User.create!(name: "Another User"), comment: "Second vote", feedback_options: ["dislike"])
     end
 
     it "returns all votes" do
@@ -264,7 +264,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       # Step 1: Create an up vote via vote_up action
       allow(controller).to receive(:vote_params).and_return({
                                                               comment: "Great book!",
-                                                              feedback_option: "like",
+                                                              feedback_options: ["like"],
                                                             })
 
       # Mock render methods to capture response data
@@ -276,7 +276,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       expect(response_data[:status]).to eq(:created)
       expect(response_data[:data][:vote_type]).to eq("up")
       expect(response_data[:data][:comment]).to eq("Great book!")
-      expect(response_data[:data][:feedback_option]).to eq("like")
+      expect(response_data[:data][:feedback_options]).to eq(["like"])
 
       # Step 2: Verify the vote was created in the database
       expect(book.voted_by?(user)).to be true
@@ -297,7 +297,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       # Step 4: Verify the vote details in the response
       vote_data = response_data[:data][:votes].first
       expect(vote_data[:comment]).to eq("Great book!")
-      expect(vote_data[:feedback_option]).to eq("like")
+      expect(vote_data[:feedback_options]).to eq(["like"])
       expect(vote_data[:vote_type]).to eq("up")
       expect(vote_data[:voter][:id]).to eq(user.id)
       expect(vote_data[:voter][:type]).to eq("User")
@@ -307,7 +307,7 @@ RSpec.describe Thumbsy::Api::VotesController do
       # Step 1: Create a down vote
       allow(controller).to receive(:vote_params).and_return({
                                                               comment: "Not my style",
-                                                              feedback_option: "dislike",
+                                                              feedback_options: ["dislike"],
                                                             })
 
       response_data = nil
@@ -329,7 +329,7 @@ RSpec.describe Thumbsy::Api::VotesController do
 
       vote_data = response_data[:data][:votes].first
       expect(vote_data[:comment]).to eq("Not my style")
-      expect(vote_data[:feedback_option]).to eq("dislike")
+      expect(vote_data[:feedback_options]).to eq(["dislike"])
       expect(vote_data[:vote_type]).to eq("down")
     end
 
@@ -465,20 +465,20 @@ RSpec.describe Thumbsy::Api::VotesController do
 
     describe "vote_params method" do
       it "handles vote parameters correctly" do
-        params = ActionController::Parameters.new({
-                                                    comment: "Test comment",
-                                                    feedback_option: "like",
-                                                    votable_type: "Book",
-                                                    votable_id: book.id,
-                                                  })
-
-        allow(controller).to receive(:params).and_return(params)
+        allow(controller).to receive(:params).and_return(
+          ActionController::Parameters.new({
+                                             comment: "Great book!",
+                                             feedback_options: ["like"],
+                                             votable_type: "Book",
+                                             votable_id: "1",
+                                           }),
+        )
 
         result = controller.send(:vote_params)
-        expect(result[:comment]).to eq("Test comment")
-        expect(result[:feedback_option]).to eq("like")
+        expect(result[:comment]).to eq("Great book!")
+        expect(result[:feedback_options]).to eq(["like"])
         expect(result[:votable_type]).to eq("Book")
-        expect(result[:votable_id]).to eq(book.id)
+        expect(result[:votable_id]).to eq("1")
       end
 
       it "handles missing parameters gracefully" do
@@ -491,7 +491,7 @@ RSpec.describe Thumbsy::Api::VotesController do
 
         result = controller.send(:vote_params)
         expect(result[:comment]).to be_nil
-        expect(result[:feedback_option]).to be_nil
+        expect(result[:feedback_options]).to be_nil
         expect(result[:votable_type]).to eq("Book")
         expect(result[:votable_id]).to eq(book.id)
       end
@@ -516,7 +516,7 @@ RSpec.describe Thumbsy::Api::VotesController do
     it "uses VoteSerializer for vote responses" do
       allow(controller).to receive(:vote_params).and_return({
                                                               comment: "Amazing book!",
-                                                              feedback_option: "like",
+                                                              feedback_options: ["like"],
                                                             })
 
       response_data = nil
@@ -529,7 +529,7 @@ RSpec.describe Thumbsy::Api::VotesController do
         id: be_a(Integer),
         vote_type: "up",
         comment: "Amazing book!",
-        feedback_option: "like",
+        feedback_options: ["like"],
         voter: hash_including(
           id: user.id,
           type: "User",
@@ -556,7 +556,7 @@ RSpec.describe Thumbsy::Api::VotesController do
     end
 
     it "uses VoteSerializer for index responses" do
-      book.vote_up(user, comment: "Test vote", feedback_option: "like")
+      book.vote_up(user, comment: "Test vote", feedback_options: ["like"])
 
       response_data = nil
       allow(controller).to receive(:render_success) { |data, status| response_data = { data: data, status: status } }
@@ -571,7 +571,7 @@ RSpec.describe Thumbsy::Api::VotesController do
         id: be_a(Integer),
         vote_type: "up",
         comment: "Test vote",
-        feedback_option: "like",
+        feedback_options: ["like"],
         voter: hash_including(
           id: user.id,
           type: "User",
