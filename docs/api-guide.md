@@ -54,7 +54,8 @@ All voting endpoints follow the pattern: `/:votable_type/:votable_id/...`
 - `POST /:votable_type/:votable_id/vote_up` - Vote up
 - `POST /:votable_type/:votable_id/vote_down` - Vote down
 - `DELETE /:votable_type/:votable_id/vote` - Remove vote
-- `GET /:votable_type/:votable_id/vote` - Get vote status
+- `GET /:votable_type/:votable_id/vote` - Get current user's vote details
+- `GET /:votable_type/:votable_id/votes/status` - Get vote status and summary
 - `GET /:votable_type/:votable_id/votes` - Get all votes
 
 ### Route Examples
@@ -64,6 +65,7 @@ POST /books/1/vote_up
 POST /comments/456/vote_down
 DELETE /books/1/vote
 GET /books/1/vote
+GET /books/1/votes/status
 GET /books/1/votes
 ```
 
@@ -208,7 +210,24 @@ end
 }
 ```
 
-### Vote Status Response
+### Vote Details Response (GET /:votable_type/:votable_id/vote)
+
+```json
+{
+  "data": {
+    "id": 123,
+    "vote_type": "up",
+    "comment": "Great book!",
+    "feedback_options": ["like"],
+    "voter": {
+      "id": 456,
+      "type": "User"
+    }
+  }
+}
+```
+
+### Vote Status Response (GET /:votable_type/:votable_id/votes/status)
 
 ```json
 {
@@ -216,7 +235,6 @@ end
     "voted": true,
     "vote_type": "up",
     "comment": "Great book!",
-    "feedback_options": ["like"],
     "vote_counts": {
       "total": 5,
       "up": 4,
@@ -274,9 +292,21 @@ const voteUp = async (votableType, votableId, comment, feedbackOptions) => {
   return data;
 };
 
-// Get vote status
-const getVoteStatus = async (votableType, votableId) => {
+// Get current user's vote details
+const getVoteDetails = async (votableType, votableId) => {
   const response = await fetch(`/api/v1/${votableType}/${votableId}/vote`, {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+  return data;
+};
+
+// Get vote status and summary
+const getVoteStatus = async (votableType, votableId) => {
+  const response = await fetch(`/api/v1/${votableType}/${votableId}/votes/status`, {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -304,6 +334,16 @@ const useVote = (votableType, votableId) => {
       console.error('Failed to fetch vote status:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchVoteDetails = async () => {
+    try {
+      const data = await getVoteDetails(votableType, votableId);
+      return data.data;
+    } catch (error) {
+      console.error('Failed to fetch vote details:', error);
+      return null;
     }
   };
 
@@ -348,7 +388,8 @@ const useVote = (votableType, votableId) => {
     loading,
     voteUp,
     voteDown,
-    removeVote
+    removeVote,
+    fetchVoteDetails
   };
 };
 ```
@@ -394,7 +435,8 @@ export function useVote(votableType, votableId) {
     loading,
     voteUp,
     voteDown,
-    removeVote
+    removeVote,
+    fetchVoteDetails
   };
 }
 ```
@@ -569,6 +611,30 @@ RSpec.describe "Thumbsy API" do
       json = JSON.parse(response.body)
       expect(json["data"]["feedback_options"]).to eq(["like"])
       expect(json["data"]["comment"]).to eq("Great book!")
+    end
+
+    it "gets current user's vote details" do
+      # First create a vote
+      post "/books/#{book.id}/vote_up", params: {
+        comment: "Great book!",
+        feedback_options: ["like"]
+      }
+
+      # Then get the vote details
+      get "/books/#{book.id}/vote"
+
+      expect(response).to have_http_status(:ok)
+      json = JSON.parse(response.body)
+      expect(json["data"]["vote_type"]).to eq("up")
+      expect(json["data"]["comment"]).to eq("Great book!")
+      expect(json["data"]["feedback_options"]).to eq(["like"])
+      expect(json["data"]["voter"]["id"]).to eq(user.id)
+    end
+
+    it "returns 404 when user has not voted" do
+      get "/books/#{book.id}/vote"
+
+      expect(response).to have_http_status(:not_found)
     end
 
     it "rejects invalid feedback_options" do
