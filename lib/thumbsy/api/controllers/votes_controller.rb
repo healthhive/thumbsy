@@ -62,6 +62,16 @@ module Thumbsy
         render_success(data)
       end
 
+      # GET /votes/vote
+      def show
+        vote = @votable.vote_by(current_voter)
+        if vote
+          render_success(Thumbsy::Api::Serializers::VoteSerializer.new(vote).as_json)
+        else
+          render_not_found(nil)
+        end
+      end
+
       # GET /votes
       def index
         votes = filtered_votes

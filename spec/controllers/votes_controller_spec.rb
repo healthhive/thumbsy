@@ -245,6 +245,32 @@ RSpec.describe Thumbsy::Api::VotesController do
     end
   end
 
+  describe "#show" do
+    before do
+      allow(controller).to receive(:find_votable)
+      controller.instance_variable_set(:@votable, book)
+    end
+
+    it "returns the current user's vote details if a vote exists" do
+      vote = book.vote_up(user, comment: "Show test", feedback_options: ["like"])
+      expect(controller).to receive(:render_success).with(
+        hash_including(
+          id: vote.id,
+          vote_type: "up",
+          comment: "Show test",
+          feedback_options: ["like"],
+          voter: hash_including(id: user.id, type: "User"),
+        ),
+      )
+      controller.show
+    end
+
+    it "returns not found if the user has not voted" do
+      expect(controller).to receive(:render_not_found).with(nil)
+      controller.show
+    end
+  end
+
   # ============================================================================
   # INTEGRATION FLOW TESTS
   # ============================================================================

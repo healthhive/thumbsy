@@ -13,7 +13,7 @@ Thumbsy::Engine.routes.draw do
     post "vote_up", to: "votes#vote_up"
     post "vote_down", to: "votes#vote_down"
     delete "vote", to: "votes#remove"
-    get "vote", to: "votes#status"
+    get "vote", to: "votes#show"
   end
 
   # Bulk operations (optional)
