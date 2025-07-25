@@ -5,9 +5,9 @@ class CreateThumbsyVotes < ActiveRecord::Migration[<%= ActiveRecord::Migration.c
       t.references :voter, null: false, type: :<%= @id_type %>, polymorphic: true, index: false
       t.boolean :vote, null: false, default: false
       t.text :comment
-      <% if defined?(@feedback_options) && @feedback_options.present? %>
-      t.integer :feedback_option
-      <% end %>
+<% if defined?(@feedback_options) && @feedback_options.present? %>
+      t.text :feedback_options, default: <%= [].to_yaml.inspect %>
+<% end %>
       t.timestamps null: false
     end
 

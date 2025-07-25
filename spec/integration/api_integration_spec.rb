@@ -27,6 +27,10 @@ RSpec.describe "Thumbsy API" do
       config.authorization_method = nil
       config.voter_serializer = nil
     end
+    Thumbsy.feedback_options = %w[like dislike funny]
+    Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
+    load "lib/thumbsy/models/thumbsy_vote.rb"
+    ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
   end
 
   after(:each) do
@@ -412,6 +416,7 @@ RSpec.describe "Thumbsy API" do
       Thumbsy.feedback_options = %w[like dislike funny]
       Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
 
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
@@ -419,48 +424,51 @@ RSpec.describe "Thumbsy API" do
       end
     end
 
-    it "accepts valid feedback_option and returns it in response" do
-      vote = book.vote_up(user, feedback_option: "like")
+    it "accepts valid feedback_options and returns them in response" do
+      vote = book.vote_up(user, feedback_options: ["like"])
       expect(vote).to be_persisted
-      expect(vote.feedback_option).to eq("like")
+      expect(vote.feedback_options).to eq(["like"])
       expect(book.voted_by?(user)).to be true
     end
 
-    it "rejects invalid feedback_option and does not create vote" do
-      result = book.vote_up(user, feedback_option: "invalid")
-      expect(result).to be false
-      expect(book.voted_by?(user)).to be false
-      expect(book.votes_count).to eq(0)
+    it "rejects invalid feedback_options and does not create vote" do
+      result = book.vote_up(user, feedback_options: ["invalid"])
+      expect(result).to be_a(ThumbsyVote)
+      expect(result).not_to be_persisted
+      expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
 
-    it "allows feedback_option to be nil" do
-      vote = book.vote_up(user, feedback_option: nil)
+    it "allows feedback_options to be nil or empty" do
+      vote = book.vote_up(user, feedback_options: nil)
       expect(vote).to be_persisted
-      expect(vote.feedback_option).to be_nil
+      expect(vote.feedback_options).to eq([])
       expect(book.voted_by?(user)).to be true
+      vote2 = book.vote_up(user, feedback_options: [])
+      expect(vote2).to be_persisted
+      expect(vote2.feedback_options).to eq([])
     end
 
-    it "updates existing vote with new feedback_option" do
-      vote = book.vote_up(user, feedback_option: "like")
-      expect(vote.feedback_option).to eq("like")
-      updated_vote = book.vote_up(user, feedback_option: "dislike")
+    it "updates existing vote with new feedback_options" do
+      vote = book.vote_up(user, feedback_options: ["like"])
+      expect(vote.feedback_options).to eq(["like"])
+      updated_vote = book.vote_up(user, feedback_options: ["dislike"])
       expect(updated_vote.id).to eq(vote.id)
-      expect(updated_vote.feedback_option).to eq("dislike")
+      expect(updated_vote.feedback_options).to eq(["dislike"])
     end
 
     it "works with vote_down method" do
-      vote = book.vote_down(user, feedback_option: "funny")
+      vote = book.vote_down(user, feedback_options: ["funny"])
       expect(vote).to be_persisted
-      expect(vote.feedback_option).to eq("funny")
+      expect(vote.feedback_options).to eq(["funny"])
       expect(vote.down_vote?).to be true
       expect(book.down_voted_by?(user)).to be true
     end
 
     it "rejects invalid feedback options and does not create vote" do
-      result = book.vote_up(user, feedback_option: "invalid_option")
-      expect(result).to be false
-      expect(book.voted_by?(user)).to be false
-      expect(book.votes_count).to eq(0)
+      result = book.vote_up(user, feedback_options: ["invalid_option"])
+      expect(result).to be_a(ThumbsyVote)
+      expect(result).not_to be_persisted
+      expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
   end
 
@@ -469,6 +477,7 @@ RSpec.describe "Thumbsy API" do
       Thumbsy.feedback_options = %w[like dislike funny]
       Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
 
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
@@ -478,11 +487,11 @@ RSpec.describe "Thumbsy API" do
 
     describe "vote_up method" do
       it "creates up vote with comment and feedback" do
-        vote = book.vote_up(user, comment: "Great book!", feedback_option: "like")
+        vote = book.vote_up(user, comment: "Great book!", feedback_options: ["like"])
         expect(vote).to be_persisted
         expect(vote.up_vote?).to be true
         expect(vote.comment).to eq("Great book!")
-        expect(vote.feedback_option).to eq("like")
+        expect(vote.feedback_options).to eq(["like"])
       end
 
       it "handles failed vote creation" do
@@ -497,20 +506,20 @@ RSpec.describe "Thumbsy API" do
         original_vote = book.vote_up(user, comment: "First vote")
         expect(original_vote.comment).to eq("First vote")
 
-        updated_vote = book.vote_up(user, comment: "Updated vote", feedback_option: "like")
+        updated_vote = book.vote_up(user, comment: "Updated vote", feedback_options: ["like"])
         expect(updated_vote.id).to eq(original_vote.id)
         expect(updated_vote.comment).to eq("Updated vote")
-        expect(updated_vote.feedback_option).to eq("like")
+        expect(updated_vote.feedback_options).to eq(["like"])
       end
     end
 
     describe "vote_down method" do
       it "creates down vote with comment and feedback" do
-        vote = book.vote_down(user, comment: "Not good", feedback_option: "dislike")
+        vote = book.vote_down(user, comment: "Not good", feedback_options: ["dislike"])
         expect(vote).to be_persisted
         expect(vote.down_vote?).to be true
         expect(vote.comment).to eq("Not good")
-        expect(vote.feedback_option).to eq("dislike")
+        expect(vote.feedback_options).to eq(["dislike"])
       end
 
       it "converts up vote to down vote" do
@@ -544,7 +553,7 @@ RSpec.describe "Thumbsy API" do
 
     describe "status method" do
       it "returns correct status for up vote" do
-        vote = book.vote_up(user, comment: "Great book!", feedback_option: "like")
+        vote = book.vote_up(user, comment: "Great book!", feedback_options: ["like"])
 
         # Simulate what the status method would return
         status_data = {
@@ -569,7 +578,7 @@ RSpec.describe "Thumbsy API" do
       end
 
       it "returns correct status for down vote" do
-        vote = book.vote_down(user, comment: "Not good", feedback_option: "dislike")
+        vote = book.vote_down(user, comment: "Not good", feedback_options: ["dislike"])
 
         status_data = {
           voted: book.voted_by?(user),
@@ -617,8 +626,8 @@ RSpec.describe "Thumbsy API" do
 
     describe "index method" do
       it "returns filtered votes with summary" do
-        book.vote_up(user, comment: "Great book!", feedback_option: "like")
-        book.vote_down(user2, comment: "Not good", feedback_option: "dislike")
+        book.vote_up(user, comment: "Great book!", feedback_options: ["like"])
+        book.vote_down(user2, comment: "Not good", feedback_options: ["dislike"])
 
         # Simulate what the index method would return
         votes = book.thumbsy_votes.includes(:voter).order(:id)
@@ -627,7 +636,7 @@ RSpec.describe "Thumbsy API" do
             id: vote.id,
             vote_type: vote.up_vote? ? "up" : "down",
             comment: vote.comment,
-            feedback_option: vote.feedback_option,
+            feedback_options: vote.feedback_options,
             voter: { id: vote.voter.id, type: vote.voter.class.name },
             created_at: vote.created_at,
             updated_at: vote.updated_at,
@@ -729,25 +738,25 @@ RSpec.describe "Thumbsy API" do
       # Test parameter handling logic
       params = {
         comment: "Test comment",
-        feedback_option: "like",
+        feedback_options: ["like"],
         votable_type: "Book",
         votable_id: book.id,
       }
 
-      permitted_params = params.slice(:comment, :feedback_option, :votable_type, :votable_id)
+      permitted_params = params.slice(:comment, :feedback_options, :votable_type, :votable_id)
 
       expect(permitted_params[:comment]).to eq("Test comment")
-      expect(permitted_params[:feedback_option]).to eq("like")
+      expect(permitted_params[:feedback_options]).to eq(["like"])
       expect(permitted_params[:votable_type]).to eq("Book")
       expect(permitted_params[:votable_id]).to eq(book.id)
     end
 
     it "handles missing parameters gracefully" do
       params = { votable_type: "Book", votable_id: book.id }
-      permitted_params = params.slice(:comment, :feedback_option, :votable_type, :votable_id)
+      permitted_params = params.slice(:comment, :feedback_options, :votable_type, :votable_id)
 
       expect(permitted_params[:comment]).to be_nil
-      expect(permitted_params[:feedback_option]).to be_nil
+      expect(permitted_params[:feedback_options]).to be_nil
       expect(permitted_params[:votable_type]).to eq("Book")
       expect(permitted_params[:votable_id]).to eq(book.id)
     end
@@ -788,6 +797,7 @@ RSpec.describe "Thumbsy API" do
       Thumbsy.feedback_options = %w[like dislike funny]
       Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
 
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
@@ -807,18 +817,18 @@ RSpec.describe "Thumbsy API" do
       end.to raise_error(ActiveRecord::RecordNotFound)
     end
 
-    it "does not allow duplicate up votes with same feedback_option" do
-      vote1 = book.vote_up(user, feedback_option: "like")
-      vote2 = book.vote_up(user, feedback_option: "like")
+    it "does not allow duplicate up votes with same feedback_options" do
+      vote1 = book.vote_up(user, feedback_options: ["like"])
+      vote2 = book.vote_up(user, feedback_options: ["like"])
       expect(vote2.id).to eq(vote1.id)
       expect(book.thumbsy_votes.count).to eq(1)
     end
 
-    it "allows changing feedback_option on existing vote" do
-      vote1 = book.vote_up(user, feedback_option: "like")
-      vote2 = book.vote_up(user, feedback_option: "dislike")
+    it "allows changing feedback_options on existing vote" do
+      vote1 = book.vote_up(user, feedback_options: ["like"])
+      vote2 = book.vote_up(user, feedback_options: ["dislike"])
       expect(vote2.id).to eq(vote1.id)
-      expect(vote2.feedback_option).to eq("dislike")
+      expect(vote2.feedback_options).to eq(["dislike"])
     end
 
     it "removes vote and allows re-voting" do
@@ -830,17 +840,14 @@ RSpec.describe "Thumbsy API" do
       expect(new_vote.down_vote?).to be true
     end
 
-    it "handles nil feedback_option gracefully" do
-      vote = book.vote_up(user, feedback_option: nil)
-      expect(vote.feedback_option).to be_nil
+    it "handles nil feedback_options gracefully" do
+      vote = book.vote_up(user, feedback_options: nil)
+      expect(vote.feedback_options).to eq([])
     end
 
-    it "handles blank feedback_option as invalid" do
-      expect do
-        book.vote_up(user, feedback_option: "")
-      end.not_to raise_error
-      vote = book.thumbsy_votes.last
-      expect(vote.feedback_option).to be_nil
+    it "handles blank feedback_options as invalid" do
+      vote = book.vote_up(user, feedback_options: [])
+      expect(vote.feedback_options).to eq([])
     end
   end
 
@@ -849,6 +856,7 @@ RSpec.describe "Thumbsy API" do
       Thumbsy.feedback_options = %w[like dislike funny]
       Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
 
       Thumbsy::Api.configure do |config|
         config.require_authentication = false
@@ -859,32 +867,27 @@ RSpec.describe "Thumbsy API" do
     it "rejects invalid feedback options and does not create vote" do
       # This test verifies that invalid feedback options are rejected
       # and no vote is created, maintaining data integrity
-      result = book.vote_up(user, feedback_option: "invalid_option")
-
-      # The vote should not be created
-      expect(result).to be false
-      expect(book.voted_by?(user)).to be false
-      expect(book.votes_count).to eq(0)
+      result = book.vote_up(user, feedback_options: ["invalid_option"])
+      expect(result).to be_a(ThumbsyVote)
+      expect(result).not_to be_persisted
+      expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
 
     it "handles invalid feedback options in controller context" do
       # This simulates what would happen in the controller
       # With the updated behavior, invalid feedback options are rejected
       # and the vote is not created, causing the controller to render an error
-      result = book.vote_up(user, feedback_option: "invalid_option")
-
-      # The vote should not be created
-      expect(result).to be false
-      expect(book.voted_by?(user)).to be false
-      expect(book.votes_count).to eq(0)
+      result = book.vote_up(user, feedback_options: ["invalid_option"])
+      expect(result).to be_a(ThumbsyVote)
+      expect(result).not_to be_persisted
+      expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
 
     it "demonstrates the correct behavior for invalid feedback options" do
-      # Correct behavior: Invalid feedback options should raise ArgumentError
-      # and no vote should be created, maintaining data integrity
+      # Correct behavior: Invalid feedback options should raise Thumbsy::InvalidFeedbackOptionError
       expect do
-        ThumbsyVote.vote_for(book, user, true, feedback_option: "invalid_option")
-      end.to raise_error(ArgumentError, /'invalid_option' is not a valid feedback_option/)
+        ThumbsyVote.vote_for(book, user, true, feedback_options: ["invalid_option"])
+      end.to raise_error(ActiveRecord::RecordInvalid, /Feedback options contains invalid feedback option/)
 
       # Verify no vote was created
       expect(book.voted_by?(user)).to be false
@@ -892,12 +895,9 @@ RSpec.describe "Thumbsy API" do
     end
 
     it "verifies that invalid feedback options are rejected at model level" do
-      # Test that invalid feedback options raise ArgumentError at the model level
       expect do
-        ThumbsyVote.vote_for(book, user, true, feedback_option: "invalid_option")
-      end.to raise_error(ArgumentError, /'invalid_option' is not a valid feedback_option/)
-
-      # Verify no vote was created in the database
+        ThumbsyVote.vote_for(book, user, true, feedback_options: ["invalid_option"])
+      end.to raise_error(ActiveRecord::RecordInvalid, /Feedback options contains invalid feedback option/)
       expect(book.votes_count).to eq(0)
     end
 
@@ -907,7 +907,7 @@ RSpec.describe "Thumbsy API" do
       #   post "/api/v1/books/#{book.id}/vote_up",
       #     headers: auth_headers,
       #     params: {
-      #       feedback_option: "invalid_option"
+      #       feedback_options: ["invalid_option"]
       #     }
       #
       #   expect(response).to have_http_status(:unprocessable_entity)
@@ -920,48 +920,56 @@ RSpec.describe "Thumbsy API" do
       # 2. The votable module catches ArgumentError and returns false
       # 3. The controller renders an error response
 
-      result = book.vote_up(user, feedback_option: "invalid_option")
-      expect(result).to be false
+      result = book.vote_up(user, feedback_options: ["invalid_option"])
+      expect(result).to be_a(ThumbsyVote)
+      expect(result).not_to be_persisted
+      expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
 
     it "demonstrates the correct behavior with invalid feedback options" do
       # With the correct behavior, invalid feedback options should be rejected
       # and no vote should be created, maintaining data integrity
-      result = book.vote_up(user, feedback_option: "invalid_option")
-
-      # The vote should not be created
-      expect(result).to be false
-      expect(book.voted_by?(user)).to be false
-      expect(book.votes_count).to eq(0)
+      result = book.vote_up(user, feedback_options: ["invalid_option"])
+      expect(result).to be_a(ThumbsyVote)
+      expect(result).not_to be_persisted
+      expect(result.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
 
     it "comprehensive feedback option validation test" do
+      ThumbsyVote.delete_all
+      ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
       # Test valid feedback options with different users
-      vote1 = book.vote_up(user, feedback_option: "like")
+      vote1 = book.vote_up(user, feedback_options: ["like"])
       expect(vote1).to be_persisted
-      expect(vote1.feedback_option).to eq("like")
+      expect(vote1.feedback_options).to eq(["like"])
 
-      vote2 = book.vote_up(user2, feedback_option: "dislike")
+      vote2 = book.vote_up(user2, feedback_options: ["dislike"])
       expect(vote2).to be_persisted
-      expect(vote2.feedback_option).to eq("dislike")
+      expect(vote2.feedback_options).to eq(["dislike"])
 
-      # Test nil feedback option (should be allowed)
-      vote3 = book.vote_up(user, feedback_option: nil)
+      # Test nil feedback options (should be allowed)
+      vote3 = book.vote_up(user, feedback_options: nil)
       expect(vote3).to be_persisted
-      expect(vote3.feedback_option).to be_nil
+      expect(vote3.feedback_options).to eq([])
       expect(vote3.id).to eq(vote1.id) # Should update the existing vote
 
       # Test invalid feedback options (should be rejected)
-      result1 = book.vote_up(user2, feedback_option: "invalid_option")
-      expect(result1).to be false
+      result1 = book.vote_up(user2, feedback_options: ["invalid_option"])
+      expect(result1).to be_a(ThumbsyVote)
+      expect(result1.errors[:feedback_options]).to include("contains invalid feedback option(s)")
+      # Ensure the feedback_options in the DB did not change to the invalid value
+      vote_in_db = ThumbsyVote.find(result1.id)
+      expect(vote_in_db.feedback_options).not_to eq(["invalid_option"])
 
-      result2 = book.vote_up(user2, feedback_option: "spam")
-      expect(result2).to be false
+      result2 = book.vote_up(user2, feedback_options: ["spam"])
+      expect(result2).to be_a(ThumbsyVote)
+      expect(result2.errors[:feedback_options]).to include("contains invalid feedback option(s)")
+      vote_in_db2 = ThumbsyVote.find(result2.id)
+      expect(vote_in_db2.feedback_options).not_to eq(["spam"])
 
       # Verify final state - only 2 votes should exist (one per user)
       expect(book.votes_count).to eq(2)
-      # The enum returns string values when accessed
-      expect(book.thumbsy_votes.pluck(:feedback_option)).to match_array([nil, "dislike"])
+      expect(book.thumbsy_votes.pluck(:feedback_options)).to match_array([[], ["dislike"]])
     end
   end
 end

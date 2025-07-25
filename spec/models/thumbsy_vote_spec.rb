@@ -17,33 +17,43 @@ RSpec.describe ThumbsyVote, type: :model do
     Thumbsy.feedback_options = %w[like dislike funny]
     Object.send(:remove_const, :ThumbsyVote) if defined?(ThumbsyVote)
     load "lib/thumbsy/models/thumbsy_vote.rb"
+    ThumbsyVote.setup_feedback_options_validation! if defined?(ThumbsyVote)
   end
 
   let!(:user) { ThumbsyVoteModelUser.create!(name: "Model User") }
   let!(:book) { ThumbsyVoteModelBook.create!(title: "Model Book") }
 
   describe "validations" do
-    it "is valid with valid feedback_option" do
-      vote = ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_option: "like")
+    it "is valid with valid feedback_options" do
+      vote = ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_options: ["like"])
       expect(vote).to be_valid
-      expect(vote.feedback_option).to eq("like")
+      expect(vote.feedback_options).to eq(["like"])
     end
 
-    it "is invalid with invalid feedback_option" do
+    it "is invalid with invalid feedback_options" do
+      vote = ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_options: ["invalid_option"])
+      expect(vote.save).to be false
+      expect(vote.errors[:feedback_options]).to include("contains invalid feedback option(s)")
+    end
+
+    it "raises on create! with invalid feedback_options" do
       expect do
-        ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_option: "invalid_option")
-      end.to raise_error(ArgumentError, /is not a valid feedback_option/)
+        ThumbsyVote.create!(votable: book, voter: user, vote: true, feedback_options: ["invalid_option"])
+      end.to raise_error(ActiveRecord::RecordInvalid, /Feedback options contains invalid feedback option/)
     end
 
-    it "allows feedback_option to be nil" do
-      vote = ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_option: nil)
+    it "allows feedback_options to be nil or empty" do
+      vote = ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_options: nil)
       expect(vote).to be_valid
-      expect(vote.feedback_option).to be_nil
+      expect(vote.feedback_options).to eq([])
+      vote2 = ThumbsyVote.new(votable: book, voter: user, vote: true, feedback_options: [])
+      expect(vote2).to be_valid
+      expect(vote2.feedback_options).to eq([])
     end
 
     it "enforces uniqueness of voter per votable" do
-      ThumbsyVote.create!(votable: book, voter: user, vote: true, feedback_option: "like")
-      dup_vote = ThumbsyVote.new(votable: book, voter: user, vote: false, feedback_option: "dislike")
+      ThumbsyVote.create!(votable: book, voter: user, vote: true, feedback_options: ["like"])
+      dup_vote = ThumbsyVote.new(votable: book, voter: user, vote: false, feedback_options: ["dislike"])
       expect(dup_vote).not_to be_valid
       expect(dup_vote.errors[:voter_id]).to include("has already been taken")
     end
@@ -63,20 +73,28 @@ RSpec.describe ThumbsyVote, type: :model do
     end
 
     it "creates a new vote if none exists" do
-      vote = ThumbsyVote.vote_for(book, user, true, comment: "First", feedback_option: "like")
+      vote = ThumbsyVote.vote_for(book, user, true, comment: "First", feedback_options: ["like"])
       expect(vote).to be_persisted
       expect(vote.vote).to be true
       expect(vote.comment).to eq("First")
-      expect(vote.feedback_option).to eq("like")
+      expect(vote.feedback_options).to eq(["like"])
     end
 
     it "updates an existing vote for the same voter/votable" do
-      vote1 = ThumbsyVote.vote_for(book, user, true, comment: "First", feedback_option: "like")
-      vote2 = ThumbsyVote.vote_for(book, user, false, comment: "Changed", feedback_option: "dislike")
+      vote1 = ThumbsyVote.vote_for(book, user, true, comment: "First", feedback_options: ["like"])
+      vote2 = ThumbsyVote.vote_for(book, user, false, comment: "Changed", feedback_options: ["dislike"])
       expect(vote2.id).to eq(vote1.id)
       expect(vote2.vote).to be false
       expect(vote2.comment).to eq("Changed")
-      expect(vote2.feedback_option).to eq("dislike")
+      expect(vote2.feedback_options).to eq(["dislike"])
+    end
+  end
+
+  describe "votable interface error reporting" do
+    it "returns a vote with errors when invalid feedback_options are given" do
+      vote = book.vote_up(user, feedback_options: ["invalid_option"])
+      expect(vote).to be_a(ThumbsyVote)
+      expect(vote.errors[:feedback_options]).to include("contains invalid feedback option(s)")
     end
   end
 
@@ -100,25 +118,5 @@ RSpec.describe ThumbsyVote, type: :model do
       Object.send(:remove_const, :ThumbsyVote)
       load "lib/thumbsy/models/thumbsy_vote.rb"
     end
-
-    it "returns the new first enum value for feedback_option if enum mapping changes (Rails behavior)" do
-      # Create a vote with the original feedback_options
-      vote = ThumbsyVote.vote_for(book, user, true, comment: "First", feedback_option: "like")
-      expect(vote.feedback_option).to eq("like")
-
-      # Change feedback_options to exclude 'like'
-      Thumbsy.feedback_options = %w[helpful unhelpful spam]
-      Object.send(:remove_const, :ThumbsyVote)
-      load "lib/thumbsy/models/thumbsy_vote.rb"
-
-      # Reload the vote from DB (should now have an integer value 0, which maps to 'helpful')
-      reloaded_vote = ThumbsyVote.find(vote.id)
-      # Rails maps the stored integer to the new enum's first value
-      expect(reloaded_vote.feedback_option).to eq("helpful")
-      # NOTE: This is a Rails enum gotcha—changing the enum mapping will remap old values to new strings.
-    end
-
-    # NOTE: It is not possible to create or update a vote with an old value after the enum mapping changes,
-    # as Rails will immediately raise ArgumentError. Only reading is possible, and it will remap to the new enum.
   end
 end

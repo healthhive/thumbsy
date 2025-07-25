@@ -1,19 +1,23 @@
 # frozen_string_literal: true
 
+require "active_record"
+require_relative "../validators/array_inclusion_validator"
+
 class ThumbsyVote < ActiveRecord::Base
-  # Setup feedback options enum if available
-  if (feedback_options = Thumbsy.feedback_options).present?
-    enum :feedback_option, feedback_options.each_with_index.to_h
-    validates :feedback_option, inclusion: { in: feedback_options }, allow_nil: true
+  serialize :feedback_options
+
+  after_initialize :set_default_feedback_options
+
+  def feedback_options=(value)
+    super(value.nil? ? [] : value)
   end
 
-  # Lazy setup of feedback options when they become available
-  def self.setup_feedback_options!
-    return if Thumbsy.feedback_options.blank?
-    return if respond_to?(:feedback_options) # Already set up
+  # Dynamically (re)setup feedback_options validation
+  def self.setup_feedback_options_validation!
+    return unless Thumbsy.feedback_options.present?
 
-    enum :feedback_option, Thumbsy.feedback_options.each_with_index.to_h
-    validates :feedback_option, inclusion: { in: Thumbsy.feedback_options }, allow_nil: true
+    _validators.delete(:feedback_options)
+    validates :feedback_options, array_inclusion: { in: Thumbsy.feedback_options }, allow_nil: false
   end
 
   belongs_to :votable, polymorphic: true
@@ -36,12 +40,9 @@ class ThumbsyVote < ActiveRecord::Base
     vote == false
   end
 
-  def self.vote_for(votable, voter, vote_value, comment: nil, feedback_option: nil)
+  def self.vote_for(votable, voter, vote_value, comment: nil, feedback_options: nil)
     raise ArgumentError, "Voter cannot be nil" if voter.nil?
     raise ArgumentError, "Votable cannot be nil" if votable.nil?
-
-    # Ensure feedback options are set up
-    setup_feedback_options!
 
     existing_vote = find_by(
       votable: votable,
@@ -52,7 +53,7 @@ class ThumbsyVote < ActiveRecord::Base
       existing_vote.update!(
         vote: vote_value,
         comment: comment,
-        feedback_option: feedback_option,
+        feedback_options: feedback_options,
       )
       existing_vote
     else
@@ -61,8 +62,14 @@ class ThumbsyVote < ActiveRecord::Base
         voter: voter,
         vote: vote_value,
         comment: comment,
-        feedback_option: feedback_option,
+        feedback_options: feedback_options,
       )
     end
+  end
+
+  private
+
+  def set_default_feedback_options
+    self.feedback_options = [] if feedback_options.nil?
   end
 end

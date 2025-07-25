@@ -39,7 +39,7 @@ ActiveRecord::Schema.define do
     t.references :voter, null: false, polymorphic: true, index: true
     t.boolean :vote, null: false
     t.text :comment
-    t.integer :feedback_option
+    t.text :feedback_options, default: "--- []\n"
     t.timestamps null: false
 
     t.index %i[voter_type voter_id votable_type votable_id],
@@ -86,6 +86,14 @@ require_relative "../lib/thumbsy/models/thumbsy_vote"
 ActiveRecord::Base.extend(Thumbsy::Extension)
 
 RSpec.configure do |config|
+  config.before(:suite) do
+    # Ensure feedback_options column exists for tests
+    unless ActiveRecord::Base.connection.column_exists?(:thumbsy_votes, :feedback_options)
+      ActiveRecord::Migration.suppress_messages do
+        ActiveRecord::Migration.add_column :thumbsy_votes, :feedback_options, :text
+      end
+    end
+  end
   # Set up Thumbsy config for tests
   Thumbsy.configure do |c|
     c.feedback_options = %w[like dislike funny]
