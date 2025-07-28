@@ -7,6 +7,7 @@ Thumbsy::Api::Engine.routes.draw do
     post "votes/vote_down", to: "votes#vote_down"
     delete "votes/remove", to: "votes#remove"
     get "votes/status", to: "votes#status"
+    get "votes/vote", to: "votes#show"
     get "votes", to: "votes#index"
 
     # Alternative shorter routes

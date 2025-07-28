@@ -123,7 +123,7 @@ This adds:
 
 - `POST /:votable_type/:votable_id/vote_up` - Vote up
 - `POST /:votable_type/:votable_id/vote_down` - Vote down
-- `GET /:votable_type/:votable_id/vote` - Get vote status
+- `GET /:votable_type/:votable_id/vote` - Get current user's vote details
 - `DELETE /:votable_type/:votable_id/vote` - Remove vote
 
 ### API Usage
@@ -134,7 +134,7 @@ curl -X POST /api/v1/books/1/vote_up \
   -H "Authorization: Bearer TOKEN" \
   -d '{"comment": "Great book!", "feedback_options": ["helpful"]}'
 
-# Get vote status
+# Get current user's vote details
 curl -X GET /api/v1/books/1/vote \
   -H "Authorization: Bearer TOKEN"
 ```
