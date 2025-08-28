@@ -170,7 +170,7 @@ jobs:
           gem build thumbsy.gemspec
           ls -la *.gem
 
-            - name: Publish to RubyGems
+      - name: Publish to RubyGems
         env:
           RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
         run: |
