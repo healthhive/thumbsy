@@ -1,6 +1,6 @@
 # Thumbsy - Rails Voting Gem
 
-[![CI](https://github.com/yourusername/thumbsy/workflows/CI/badge.svg)](https://github.com/yourusername/thumbsy/actions)
+[![CI](https://github.com/healthhive/thumbsy/workflows/CI/badge.svg)](https://github.com/healthhive/thumbsy/actions)
 
 A Rails gem for adding thumbs up/down voting functionality with comments and feedback_options.
 Includes optional JSON API endpoints.
@@ -214,6 +214,36 @@ end
 - **Basic Usage**: This README
 - **API Guide**: [docs/api-guide.md](docs/api-guide.md) - Complete API documentation and integration examples
 - **Architecture Guide**: [docs/architecture-guide.md](docs/architecture-guide.md) - Technical details and design decisions
+- **Release Guide**: [docs/release-guide.md](docs/release-guide.md) - How to release new versions to RubyGems
+
+## Releases
+
+Thumbsy uses automated releases with semantic versioning. To release a new version:
+
+### Quick Release
+
+```bash
+# Automatically determine version bump from commits
+ruby script/bump_version.rb
+
+# Or manually specify bump type
+ruby script/bump_version.rb minor
+```
+
+### Release Process
+
+1. **Version Bump**: The script automatically updates version files
+2. **Git Tag**: Creates a version tag (e.g., `v1.1.0`)
+3. **Push Tag**: `git push origin v1.1.0`
+4. **Automated Release**: CI/CD pipeline publishes to RubyGems and creates GitHub release
+
+### Version Bumping Rules
+
+- **Patch** (`1.0.0` → `1.0.1`): Bug fixes, docs, performance
+- **Minor** (`1.0.0` → `1.1.0`): New features (backward compatible)
+- **Major** (`1.0.0` → `2.0.0`): Breaking changes
+
+See [docs/release-guide.md](docs/release-guide.md) for complete release documentation.
 
 ## Development & Testing
 

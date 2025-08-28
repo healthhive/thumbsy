@@ -3,7 +3,7 @@
 Gem::Specification.new do |spec|
   spec.name          = "thumbsy"
   spec.version       = "1.0.0"
-  spec.authors       = ["Tiago"]
+  spec.authors       = ["HealthsHive"]
   spec.email         = ["development@healthhive.org"]
 
   spec.summary       = "A Rails gem for adding voting/liking functionality to ActiveRecord models"
